@@ -78,51 +78,72 @@ def poly2ds_to_mask(shape: ImageSize, poly2d: List[Poly2D]) -> NDArrayU8:
     mask = mask.reshape((shape.height, shape.width, -1))[..., 0]
     plt.close()
     return mask
-    
-    
+
+
 import os
 import cv2
 import numpy as np
 import json
 import matplotlib.pyplot as plt
 
+
+
 class CustomDataLoader:
-    def __init__(self, data_path,label_path, image_size=(720, 1280), normalize=True, class_mapping=None):
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None, batch_size=16):
         self.data_path = data_path
         self.image_size = image_size
         self.normalize = normalize
         self.class_mapping = class_mapping
         self.label_path = label_path
-        self.images = []
-        self.masks = []
-
-
+        self.batch_size = batch_size
+        self.annotations = self.load_data()
+        self.num_samples = len(self.annotations)
 
     def load_data(self):
         json_file_path = os.path.join(self.label_path, 'bdd100k_labels_images_train.json')
         with open(json_file_path, 'r') as f:
             annotations = json.load(f)
+            
+        return self.filter_invalid_images(annotations)
 
-        for annotation in annotations[:200]:
+    def filter_invalid_images(self, annotations):
+        valid_annotations = []
+        for annotation in annotations:
             image_name = annotation['name']
             image_path = os.path.join(self.data_path, image_name)
             if os.path.exists(image_path):
-              print(annotation['name'])
+                valid_annotations.append(annotation)
+            else:
+                continue
+        return valid_annotations
 
-              image = cv2.imread(image_path)
 
-              drivable_mask, lane_mark_mask = self.create_masks(image, annotation)
+    def process_batch(self, batch_annotations):
+        batch_images = []
+        batch_drivable_masks = []
+        batch_lane_masks = []
 
-              image = self.resize_image(image)
-              drivable_mask = self.resize_mask(drivable_mask)
-              lane_mark_mask = self.resize_mask(lane_mark_mask)
-              if self.normalize:
-                  image = self.normalize_image(image)
+        for annotation in batch_annotations:
+            image_name = annotation['name']
+            image_path = os.path.join(self.data_path, image_name)
+            if os.path.exists(image_path):
+                image = cv2.imread(image_path)
 
-              self.images.append(image)
-              self.masks.append((drivable_mask, lane_mark_mask))
+                drivable_mask, lane_mark_mask = self.create_masks(image, annotation)
+
+                # Resize drivable_mask and lane_mark_mask to the desired image size
+                drivable_mask = self.resize_mask(drivable_mask)
+                lane_mark_mask = self.resize_mask(lane_mark_mask)
+
+                # Append processed data to lists
+                batch_images.append(image)
+                batch_drivable_masks.append(drivable_mask[np.newaxis])  # Add a new axis to make it (1, H, W)
+                batch_lane_masks.append(lane_mark_mask[np.newaxis])  # Add a new axis to make it (1, H, W)
+
             else:
               continue
+            return batch_images, batch_drivable_masks, batch_lane_masks
+
     def create_masks(self, image, annotation):
         lane_masks = np.zeros_like(image[:,:,0])
         drivable_area_masks = np.zeros_like(image[:,:,0])
@@ -175,59 +196,53 @@ class CustomDataLoader:
     def normalize_image(self, image):
         return image.astype(np.float32) / 255.0
 
-    def get_data(self):
-        return np.array(self.images), np.array(self.masks)
 
-    def clear_data(self):
-        self.images.clear()
-        self.masks.clear()
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, index):
-        return self.images[index], self.masks[index]
-
-
-
-import os
-import cv2
-import numpy as np
-import json
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-
-
 class CustomDataset(Dataset):
-
-    def __init__(self, data_path, label_path,image_size=(720, 1280), normalize=True, class_mapping=None):
-        self.data_loader = CustomDataLoader(data_path,label_path, image_size, normalize, class_mapping)
-        self.data_loader.load_data()
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None, batch_size=8):
+        self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping, batch_size)
+        self.batch_size = batch_size
+        self.image_size =  image_size
 
     def __len__(self):
-        return len(self.data_loader)
+        return self.data_loader.num_samples // self.batch_size
 
     def __getitem__(self, index):
-        image, (drivable_mask, lane_mask) = self.data_loader[index] 
-        image = torch.tensor(image.transpose(2, 0, 1), dtype=torch.float32)
-        drivable_mask = torch.tensor(drivable_mask, dtype=torch.float32)
-        lane_mask = torch.tensor(lane_mask, dtype=torch.float32)
 
-        return image, drivable_mask, lane_mask
+        start_idx = index * self.batch_size
+        end_idx = min((index + 1) * self.batch_size, self.data_loader.num_samples)
+        batch_annotations = self.data_loader.annotations[start_idx:end_idx]
 
+        batch_images, batch_drivable_masks, batch_lane_masks = self.data_loader.process_batch(batch_annotations)
 
-# Create custom dataset and data loader
+        if len(batch_images) == 0:  # Handle empty batch
+            batch_images = np.zeros((1, *self.image_size, 3), dtype=np.float32)
+            batch_drivable_masks = np.zeros((1, *self.image_size), dtype=np.float32)
+            batch_lane_masks = np.zeros((1, *self.image_size), dtype=np.float32)
+
+        # Convert lists to numpy arrays and stack the masks
+        batch_images = np.array(batch_images)
+        batch_drivable_masks = np.stack(batch_drivable_masks, axis=0)
+        batch_lane_masks = np.stack(batch_lane_masks, axis=0)
+        batch_images = torch.tensor(batch_images.transpose(0, 3, 1, 2), dtype=torch.float32)
+        batch_drivable_masks = torch.tensor(batch_drivable_masks, dtype=torch.float32)  # No need for unsqueeze
+        batch_lane_masks = torch.tensor(batch_lane_masks, dtype=torch.float32)  # No need for unsqueeze
+
+        return batch_images, batch_drivable_masks, batch_lane_masks
+
+# Usage
+data_path = "/content/dataset/bdd100k/bdd100k/images/100k/train/"
+label_path = '/content/dataset/bdd100k_labels_release/bdd100k/labels/'
 class_mapping = {
     'traffic_light': 0,
     'traffic_sign': 1,
     'car': 2
 }
-data_path = "/content/dataset/bdd100k/bdd100k/images/10k/train"
-label_path = '/content/dataset/bdd100k_labels_release/bdd100k/labels'
-dataset = CustomDataset(data_path,label_path, image_size=(180, 320), normalize=True, class_mapping=class_mapping)
+dataset = CustomDataset(data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=class_mapping)
 batch_size = 8  # Choose your desired batch size
-train_data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+train_data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1)
 
 # Example of how to iterate through the data loader during training
 for i, (batch_images, drivable_masks, lane_masks) in enumerate(train_data_loader):
@@ -238,6 +253,6 @@ for i, (batch_images, drivable_masks, lane_masks) in enumerate(train_data_loader
         print(batch_images.shape)
         print(drivable_masks.shape)
         print(lane_masks.shape)
-        print(i * 8)
+        print(i * batch_size)  # Print the starting index of each batch
     except:
         continue

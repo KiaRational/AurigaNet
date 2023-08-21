@@ -7,7 +7,7 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 import albumentations as A
-
+from PreProcess import CustomDataLoader
 
 # only for test
 def max_pooling_2d( input_array, pool_size=(2, 2),Type = "max"):

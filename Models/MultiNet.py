@@ -1,7 +1,7 @@
 importh torch
 from torrch import nn
-from BackBone import BackBone
-from SegNeck import SegNeck
+from .BackBone import BackBone
+from .SegNeck import SegNeck
 
 class MultiNet(nn.Module):
     """

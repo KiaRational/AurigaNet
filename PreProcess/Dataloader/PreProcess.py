@@ -5,7 +5,7 @@ import json
 import matplotlib.pyplot as plt
 import time
 from copy import deepcopy
-from create_masks import poly2ds_to_mask ,  ImageSize
+from .CreateMask import poly2ds_to_mask ,  ImageSize
 
 
 class CustomDataLoader:

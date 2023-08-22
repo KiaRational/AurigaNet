@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import albumentations as A
+# import albumentations as A
+import shutil
 from .PreProcess import CustomDataLoader
 
 # only for test
@@ -29,29 +30,57 @@ def max_pooling_2d( input_array, pool_size=(2, 2),Type = "max"):
     return pooled_array
 
 class LabelGenerator(Dataset):
-    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None):
+    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None):
+
         self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping)
+
         self.image_size = image_size
 
+        self.save_dir = save_dir
+
+        self.check_disk_space(self.save_dir , self.data_loader.num_samples )
+
+
+    def calculate_disk_space(self, num_samples):
+        # Size calculation for image, cluster_mask, and instance_mask
+        image_size = np.array((3, 640, 640)).nbytes  # Size of float32 data in bytes
+        cluster_mask_size = np.array((2, 320, 320)).nbytes # Size of int32 data in bytes
+        instance_mask_size = np.array((2, 6400, 6400)).nbytes # Size of int32 data in bytes
+
+        total_size = num_samples * (image_size + cluster_mask_size + instance_mask_size)
+
+        return total_size
+
+    def check_disk_space(self, save_dir, num_samples):
+
+        required_space = self.calculate_disk_space(num_samples)
+        available_space = shutil.disk_usage(save_dir).free
+        print(required_space,available_space)
+        if required_space > available_space:
+            raise ValueError(" ⚠️ Not enough disk space available for saving the data! ")
+
     def __len__(self):
+
         return self.data_loader.num_samples
 
+    
     def __getitem__(self, index):
 
         annotation = self.data_loader.annotations[index]
 
-        image  , cluster_mask = self.data_loader.process(annotation)
-        # Convert lists to numpy arrays and stack the masks
+        image  , cluster_mask , instance_mask , image_name = self.data_loader.process(annotation)
+        
 
-        image = image.transpose((2, 0, 1))
+        # image = image.transpose((2, 0, 1))
 
-        return image, mask
+        return image, cluster_mask , instance_mask , image_name
 
 
 class DataLoaderX(DataLoader):
     """prefetch dataloader"""
     def __iter__(self):
         return BackgroundGenerator(super().__iter__())
+
 
 # # Usage
 # data_path = "/content/dataset/bdd100k/bdd100k/images/100k/val/"

@@ -5,7 +5,8 @@ import json
 import matplotlib.pyplot as plt
 import time
 from copy import deepcopy
-from .CreateMask import poly2ds_to_mask ,  ImageSize
+
+from .CreatMask import poly2ds_to_mask ,  ImageSize
 
 
 class CustomDataLoader:
@@ -18,13 +19,12 @@ class CustomDataLoader:
         self.annotations = self.load_data()
         self.num_samples = len(self.annotations)
 
-        self.fig = plt.figure(facecolor="0")
-        self.fig.set_size_inches(1280 / self.fig.get_dpi(), 720 / self.fig.get_dpi())
-        self.ax = self.fig.add_axes([0, 0, 1, 1])
+        # self.fig = plt.figure(facecolor="0")
+        # self.fig.set_size_inches(1280 / self.fig.get_dpi(), 720 / self.fig.get_dpi())
+        # self.ax = self.fig.add_axes([0, 0, 1, 1])
 
     def load_data(self):
-        json_file_path = os.path.join(self.label_path, 'bdd100k_labels_images_val.json')
-        print("two")
+        json_file_path = os.path.join(self.label_path, 'bdd100k_labels_images_train.json')
         with open(json_file_path, 'r') as f:
             annotations = json.load(f)
 
@@ -43,70 +43,79 @@ class CustomDataLoader:
 
 
     def process(self, annotation):
-
+        # Initialize variables
         image = None
         combined_mask = None
         lane_mark_mask = None
         drivable_mask = None
 
+        # Get image name and path from the annotation
         image_name = annotation['name']
         image_path = os.path.join(self.data_path, image_name)
+
+        # Read and convert the image to RGB format
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        drivable_clustered_mask , lane_clustered_mask = self.create_masks(self.fig, self.ax, annotation)
+        # Create drivable and lane cluster masks
+        drivable_clustered_mask , lane_clustered_mask = self.create_masks(annotation)#self.create_masks(self.fig, self.ax, annotation)
 
-        # Resize drivable_mask and lane_mark_mask to the desired image size
+        # Resize and normalize the image
         image = self.resize_image(image)
         image = self.normalize_image(image)
+
+        # Resize drivable and lane cluster masks
         lane_clustered_mask = self.resize_mask(lane_clustered_mask)
         drivable_clustered_mask = self.resize_mask(drivable_clustered_mask)
-        # Append processed data to lists
-        cluster_mask = [drivable_clustered_mask , lane_clustered_mask]
 
-        '''
-        # TO DO: need to make an instance mask for each mask
-        '''
+        # Combine drivable and lane cluster masks
+        cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask])
 
-        pooled = self.max_pooling_2d(drivable_clustered_mask)
-        pooled = self.max_pooling_2d(pooled)
-        t1 = time.time() # remove
-        ground = self.cluster_to_embedding_feature(pooled,size=80) 
-        t2 = time.time() # remove
-        print(t2-t1)  
+        # Apply max pooling twice to drivable and lane cluster masks
+        drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask))
+        lane_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(lane_clustered_mask))
 
-        return image, cluster_mask , ground
+        # Convert cluster masks to instance masks using embedding feature
+        instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=80) 
+        instance_lane     = self.cluster_to_embedding_feature(lane_clustered_mask_pooled   ,   size=80)
+
+        # Combine drivable and lane instance masks
+        instance_mask = np.stack([instance_drivable , instance_lane])
+
+        # Return processed image, cluster masks, and instance masks
+        return image, cluster_mask , instance_mask , image_name
 
 
-    def create_masks(self, fig, ax, annotation):
+    def create_masks(self, annotation):
         lane_clustered = np.zeros((720, 1280))
         drivable_clustered = np.zeros((720, 1280))
         lane_cluster_index = 0
         drivable_cluster_index = 0
         for label_info in annotation['labels']:
+
             category = label_info['category']
+
             if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
+
                 poly2d = label_info['poly2d']
                 image_size = ImageSize(width=1280, height=720)
-                lane_mask = poly2ds_to_mask(self.fig, self.ax, image_size, poly2d)  # Pass fig and ax here
+                lane_mask = poly2ds_to_mask(image_size, poly2d)  # Pass fig and ax here
 
                 lane_cluster_index += 1
-
-
-
-
                 lane_clustered += (lane_mask/255)*lane_cluster_index
 
             if category == 'drivable area':
+
                 poly2d = label_info['poly2d']
                 image_size = ImageSize(width=1280, height=720)
-                drivable_area_mask = poly2ds_to_mask(fig, ax, image_size, poly2d)  # Pass fig and ax here
+                drivable_area_mask = poly2ds_to_mask(image_size, poly2d)  # Pass fig and ax here
                 drivable_cluster_index += 1
                 drivable_clustered += (drivable_area_mask/255)*drivable_cluster_index
 
         return drivable_clustered ,lane_clustered
 
     def max_pooling_2d(self , input_array, pool_size=(2, 2)):
+
         input_height, input_width = input_array.shape
         output_height = input_height // pool_size[0]
         output_width = input_width // pool_size[1]
@@ -125,17 +134,23 @@ class CustomDataLoader:
     def cluster_to_embedding_feature(self, cluster_mask , size):
         
         temp = cluster_mask
-        dimensions = size**2
-        ground = np.zeros((1, dimensions,dimensions))
 
-        for i in range(dimensions): #make gt
+        dimensions = size**2
+
+        ground = np.zeros((1, dimensions , dimensions))
+
+        for i in range(dimensions): # make feature embedding ground truth 
+
             temp = temp.flatten()
             gt_one = deepcopy(temp)
+
             if temp[i]>0:
+
                 gt_one[temp==temp[i]] = 1   #same instance
                 gt_one[temp!=temp[i]] = 2 #different instance, same class
                 gt_one[temp==0] = 3 #different instance, different class
                 ground[0][i] += gt_one
+
         return ground
 
     def resize_image(self, image):

@@ -98,6 +98,40 @@ class MixedUpsample(nn.Module):
         """
         return self.upsampleconv(x) + self.upsamplelinear(x)
 
+class ResidualBottleneckBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1):
+        super(ResidualBottleneckBlock, self).__init__()
+        self.layer1 = ConvBNReLU(in_channels=in_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
+        self.layer2 = ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=kernel_size, padding=padding, stride=stride)
+        self.layer3 = ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
+        self.res_conv = None
+        if in_channels != out_channels:
+            self.res_conv = ConvBNReLU(in_channels=in_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
+
+    def forward(self, x):
+        res = x if self.res_conv is None else self.res_conv(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+
+        return x + res
+
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, repeat_num = 4):
+        super(BasicBlock, self).__init__()
+        self.layers = nn.ModuleList()
+        for i in range(repeat_num):
+            if i == 0:
+                self.layers.append(ResidualBottleneckBlock(in_channels, out_channels, kernel_size, padding, stride))
+            else:
+                self.layers.append(ResidualBottleneckBlock(out_channels, out_channels, kernel_size, padding, stride))
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+
 class Output(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Output, self).__init__()
@@ -185,82 +219,66 @@ class SegNeck(nn.Module):
         Resize (int, optional): The factor by which the feature maps are resized. Default is 1.
     """
 
-  def __init__(self, Resize = 1):
-    super(SegNeck,self).__init__()
-    # BasicBlockB_S B is number of branch and S is number of stage
-    self.BasicBlock1_1 = BasicBlock(in_channels = 64 , out_channels = 64//Resize)
-    self.BasicBlock1_4 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock1_2 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock1_3 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock2_2 = BasicBlock(in_channels = 128 , out_channels = 128//Resize)
-    self.BasicBlock2_3 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-    self.BasicBlock2_4 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-    self.BasicBlock3_3 = BasicBlock(in_channels = 256 , out_channels = 256//Resize)
-    self.BasicBlock3_4 = BasicBlock(in_channels = 256//Resize , out_channels = 256//Resize)
-    self.BasicBlock4_4 = BasicBlock(in_channels = 512 , out_channels = 512//Resize)
-    self.mixUpsample2_4_2 = MixedUpsample(in_channels = 128//Resize , out_channels = 128//Resize , upsample_ratio=2)
-    self.mixUpsample3_4_4 = MixedUpsample(in_channels = 256//Resize , out_channels = 256//Resize , upsample_ratio=4)
-    self.mixUpsample4_4_8 = MixedUpsample(in_channels = 512//Resize , out_channels = 512//Resize , upsample_ratio=8)
+    def __init__(self, Resize = 1):
+        super(SegNeck,self).__init__()
+        # BasicBlockB_S B is number of branch and S is number of stage
+        self.BasicBlock1_1 = BasicBlock(in_channels = 64 , out_channels = 64//Resize)
+        self.BasicBlock1_4 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
+        self.BasicBlock1_2 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
+        self.BasicBlock1_3 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
+        self.BasicBlock2_2 = BasicBlock(in_channels = 128 , out_channels = 128//Resize)
+        self.BasicBlock2_3 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
+        self.BasicBlock2_4 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
+        self.BasicBlock3_3 = BasicBlock(in_channels = 256 , out_channels = 256//Resize)
+        self.BasicBlock3_4 = BasicBlock(in_channels = 256//Resize , out_channels = 256//Resize)
+        self.BasicBlock4_4 = BasicBlock(in_channels = 512 , out_channels = 512//Resize)
+        self.mixUpsample2_4_2 = MixedUpsample(in_channels = 128//Resize , out_channels = 128//Resize , upsample_ratio=2)
+        self.mixUpsample3_4_4 = MixedUpsample(in_channels = 256//Resize , out_channels = 256//Resize , upsample_ratio=4)
+        self.mixUpsample4_4_8 = MixedUpsample(in_channels = 512//Resize , out_channels = 512//Resize , upsample_ratio=8)
 
-    self.relu = nn.ReLU(inplace=False)
-    self.Fusing2 = FusionLayer(2,2,64//Resize)
-    self.Fusing3 = FusionLayer(3,3,64//Resize)
-    self.Fusing4 = FusionLayer(4,4,64//Resize)
-    self.Output  = Output(in_channels=480,out_channels=2)
+        self.relu = nn.ReLU(inplace=False)
+        self.Fusing2 = FusionLayer(2,2,64//Resize)
+        self.Fusing3 = FusionLayer(3,3,64//Resize)
+        self.Fusing4 = FusionLayer(4,4,64//Resize)
+        self.Output  = Output(in_channels=480,out_channels=2)
 
-  def forward(self, Half,Quarter,Octant,One_sixteenth):
+    def forward(self, Half,Quarter,Octant,One_sixteenth):
+        # -----------------------Stage 1------------------------
 
-    """
-    Forward pass of the segmentation network neck.
-
-    Args:
-        Half (torch.Tensor): Input tensor for the half-size feature map.
-        Quarter (torch.Tensor): Input tensor for the quarter-size feature map.
-        Octant (torch.Tensor): Input tensor for the octant-size feature map.
-        One_sixteenth (torch.Tensor): Input tensor for the one-sixteenth-size feature map.
-
-    Returns:
-        torch.Tensor: Output tensor representing the segmented predictions.
-    """
-    # -----------------------Stage 1------------------------
-
-    Branch1 =      self.BasicBlock1_1(self.relu(Half))
+        Branch1 =      self.BasicBlock1_1(self.relu(Half))
 
 
-    # -----------------------Stage 2------------------------
+        # -----------------------Stage 2------------------------
 
-    Branch2 =      self.BasicBlock2_2(self.relu(Quarter))
+        Branch2 =      self.BasicBlock2_2(self.relu(Quarter))
 
-    Branch1 , Branch2 = self.Fusing2([Branch1,Branch2])
+        Branch1 , Branch2 = self.Fusing2([Branch1,Branch2])
 
 
-    # -----------------------Stage 3------------------------
+        # -----------------------Stage 3------------------------
 
-    Branch1 = self.BasicBlock1_3(Branch1)
-    Branch2 = self.BasicBlock2_3(Branch2)
-    Branch3 = self.BasicBlock3_3(self.relu(Octant))
+        Branch1 = self.BasicBlock1_3(Branch1)
+        Branch2 = self.BasicBlock2_3(Branch2)
+        Branch3 = self.BasicBlock3_3(self.relu(Octant))
 
-    Branch1 , Branch2 , Branch3 = self.Fusing3([Branch1 , Branch2 , Branch3])
+        Branch1 , Branch2 , Branch3 = self.Fusing3([Branch1 , Branch2 , Branch3])
 
-    # -----------------------Stage 4------------------------
+        # -----------------------Stage 4------------------------
 
-    Branch1 = self.BasicBlock1_4(Branch1)
-    Branch2 = self.BasicBlock2_4(Branch2)
-    Branch3 = self.BasicBlock3_4(Branch3)
-    Branch4 = self.BasicBlock4_4(self.relu(One_sixteenth))
+        Branch1 = self.BasicBlock1_4(Branch1)
+        Branch2 = self.BasicBlock2_4(Branch2)
+        Branch3 = self.BasicBlock3_4(Branch3)
+        Branch4 = self.BasicBlock4_4(self.relu(One_sixteenth))
 
-    Branch1 , Branch2 , Branch3 , Branch4 = self.Fusing4([Branch1 , Branch2 , Branch3 , Branch4])
+        Branch1 , Branch2 , Branch3 , Branch4 = self.Fusing4([Branch1 , Branch2 , Branch3 , Branch4])
 
-    # ------------------------Output------------------------
+        # ------------------------Output------------------------
+        Branch1 = self.BasicBlock1_4(Branch1)
+        Branch2_1 = self.mixUpsample2_4_2(Branch2)
+        Branch3_1 = self.mixUpsample3_4_4(Branch3)
+        Branch4_1 = self.mixUpsample4_4_8(Branch4)
+        Out = torch.cat((Branch1,Branch2_1,Branch3_1 , Branch4_1),dim=1)
+        Out = self.Output(Out)
 
-    Branch1 = self.BasicBlock1_4(Branch1)
-    Branch2_1 = self.mixUpsample2_4_2(Branch2)
-    Branch3_1 = self.mixUpsample3_4_4(Branch3)
-    Branch4_1 = self.mixUpsample4_4_8(Branch4)
-
-    Out = torch.cat((Branch1,Branch2_1,Branch3_1 , Branch4_1),dim=1)
-
-    Out = self.Output(Out)
-
-    return Out
+        return Out
 

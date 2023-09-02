@@ -85,7 +85,8 @@ class BackBone(nn.Module):
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
         self.bottleneck4 = BottleNeck(in_channels=out_channels_list[2], out_channels=out_channels_list[3],
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-
+        self.bottleneck5 = BottleNeck(in_channels=out_channels, out_channels=out_channels*2,
+                                      kernel_size=3, padding=1, stride=1, resize_module=True)
     def forward(self, x):
         """
         Forward pass of the backbone module.
@@ -101,5 +102,6 @@ class BackBone(nn.Module):
         Quarter = self.bottleneck2(Half)
         Octant = self.bottleneck3(Quarter)
         One_sixteenth = self.bottleneck4(Octant)
+        One_thirtysecond = self.bottleneck5(One_sixteenth)
 
-        return Half, Quarter, Octant, One_sixteenth
+        return Half, Quarter, Octant, One_sixteenth, One_thirtysecond

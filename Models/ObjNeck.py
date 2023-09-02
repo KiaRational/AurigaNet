@@ -124,7 +124,11 @@ class ObjNeck(nn.Module):
 
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
+<<<<<<< HEAD
     def forward(self, Octant, One_sixteenth , One_thirtysecond):
+=======
+    def forward(self, Octant, One_sixteenth, One_thirtysecond):
+>>>>>>> origin/main
 
         backbone_connection = [Octant, One_sixteenth, One_thirtysecond]
 

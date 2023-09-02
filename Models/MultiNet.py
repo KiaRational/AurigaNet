@@ -15,8 +15,9 @@ class MultiNet(nn.Module):
     """
     def __init__(self):
         super(MultiNet, self).__init__()
-        self.BackBone = BackBone(in_channels=3, out_channels=512)
-        self.Seg = SegNeck(Resize=2)
+        out_channels_list = [32,64,128,256]
+        self.BackBone = BackBone(in_channels=3, out_channels_list=out_channels_list)
+        self.Seg = SegNeck(out_channels_list , class_number = 2)
     
     def forward(self, x):
         """

@@ -185,28 +185,28 @@ class SegNeck(nn.Module):
         Resize (int, optional): The factor by which the feature maps are resized. Default is 1.
     """
 
-  def __init__(self, Resize = 1):
+  def __init__(self, out_channels_list = out_channels_list , class_number = class_number):
     super(SegNeck,self).__init__()
     # BasicBlockB_S B is number of branch and S is number of stage
-    self.BasicBlock1_1 = BasicBlock(in_channels = 64 , out_channels = 64//Resize)
-    self.BasicBlock1_4 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock1_2 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock1_3 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-    self.BasicBlock2_2 = BasicBlock(in_channels = 128 , out_channels = 128//Resize)
-    self.BasicBlock2_3 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-    self.BasicBlock2_4 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-    self.BasicBlock3_3 = BasicBlock(in_channels = 256 , out_channels = 256//Resize)
-    self.BasicBlock3_4 = BasicBlock(in_channels = 256//Resize , out_channels = 256//Resize)
-    self.BasicBlock4_4 = BasicBlock(in_channels = 512 , out_channels = 512//Resize)
-    self.mixUpsample2_4_2 = MixedUpsample(in_channels = 128//Resize , out_channels = 128//Resize , upsample_ratio=2)
-    self.mixUpsample3_4_4 = MixedUpsample(in_channels = 256//Resize , out_channels = 256//Resize , upsample_ratio=4)
-    self.mixUpsample4_4_8 = MixedUpsample(in_channels = 512//Resize , out_channels = 512//Resize , upsample_ratio=8)
+    self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+    self.BasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+    self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+    self.BasicBlock1_3 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+    self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+    self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+    self.BasicBlock2_4 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+    self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
+    self.BasicBlock3_4 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
+    self.BasicBlock4_4 = BasicBlock(in_channels = out_channels_list[3] , out_channels = out_channels_list[3])
+    self.mixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
+    self.mixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
+    self.mixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
 
     self.relu = nn.ReLU(inplace=False)
-    self.Fusing2 = FusionLayer(2,2,64//Resize)
-    self.Fusing3 = FusionLayer(3,3,64//Resize)
-    self.Fusing4 = FusionLayer(4,4,64//Resize)
-    self.Output  = Output(in_channels=480,out_channels=2)
+    self.Fusing2 = FusionLayer(2,2,out_channels_list[0])
+    self.Fusing3 = FusionLayer(3,3,out_channels_list[0])
+    self.Fusing4 = FusionLayer(4,4,out_channels_list[0])
+    self.Output  = Output(in_channels=np.sum(out_channels),out_channels= class_number)
 
   def forward(self, Half,Quarter,Octant,One_sixteenth):
 

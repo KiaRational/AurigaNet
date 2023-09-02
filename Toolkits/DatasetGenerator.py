@@ -24,7 +24,7 @@ def main():
 
     # Usage
     data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/train/"
-    label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/'
+    label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_train.json'
     save_path = '/home/kia/BDD100K/Generated/'
 
     class_mapping = {
@@ -44,7 +44,7 @@ def main():
     os.makedirs(image_save_dir, exist_ok=True)
     os.makedirs(mask_save_dir, exist_ok=True)
 
-    for i, (image, cluster_mask, instance_mask, image_name) in enumerate(tqdm(train_data_loader)):
+    for i, (image, cluster_mask, instance_mask , objects_annotations , image_name) in enumerate(tqdm(train_data_loader)):
         # image_save_name = str(image_name[0][:-4]) + ".npy"
         # cluster_mask_save_name = str(image_name[0][:-4]) + "_cluster_mask.npy"
         # instance_mask_save_name = str(image_name[0][:-4]) + "_instance_mask.npy"

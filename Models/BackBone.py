@@ -74,16 +74,16 @@ class BackBone(nn.Module):
         stride (int, optional): Stride used for the convolution operations. Default is 1.
         resize_module (bool, optional): Whether the module is used for resizing. Default is False.
     """
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, resize_module=False):
+    def __init__(self, in_channels, out_channels_list, kernel_size=3, padding=1, stride=1 ,  resize_module=False):
         super(BackBone, self).__init__()
-        self.layer1 = ConvBNSiLU(in_channels=in_channels, n_filters=out_channels // 16, k_size=7, padding=3, stride=1)
-        self.bottleneck1 = BottleNeck(in_channels=out_channels // 16, out_channels=out_channels // 8,
+        self.layer1 = ConvBNSiLU(in_channels=in_channels, n_filters=out_channels_list[0], k_size=7, padding=3, stride=1)
+        self.bottleneck1 = BottleNeck(in_channels=out_channels_list[0], out_channels=out_channels_list[0],
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck2 = BottleNeck(in_channels=out_channels // 8, out_channels=out_channels // 4,
+        self.bottleneck2 = BottleNeck(in_channels=out_channels_list[0], out_channels=out_channels_list[1],
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck3 = BottleNeck(in_channels=out_channels // 4, out_channels=out_channels // 2,
+        self.bottleneck3 = BottleNeck(in_channels=out_channels_list[1], out_channels=out_channels_list[2],
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck4 = BottleNeck(in_channels=out_channels // 2, out_channels=out_channels,
+        self.bottleneck4 = BottleNeck(in_channels=out_channels_list[2], out_channels=out_channels_list[3],
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
 
     def forward(self, x):

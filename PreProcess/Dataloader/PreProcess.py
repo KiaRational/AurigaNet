@@ -24,7 +24,7 @@ class CustomDataLoader:
         # self.ax = self.fig.add_axes([0, 0, 1, 1])
 
     def load_data(self):
-        json_file_path = os.path.join(self.label_path, 'bdd100k_labels_images_train.json')
+        json_file_path = os.path.join(self.label_path)
         with open(json_file_path, 'r') as f:
             annotations = json.load(f)
 
@@ -58,7 +58,7 @@ class CustomDataLoader:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Create drivable and lane cluster masks
-        drivable_clustered_mask , lane_clustered_mask = self.create_masks(annotation)#self.create_masks(self.fig, self.ax, annotation)
+        drivable_clustered_mask , lane_clustered_mask , object_annotations = self.create_masks(annotation)#self.create_masks(self.fig, self.ax, annotation)
 
         # Resize and normalize the image
         image = self.resize_image(image)
@@ -83,14 +83,15 @@ class CustomDataLoader:
         instance_mask = np.stack([instance_drivable , instance_lane])
 
         # Return processed image, cluster masks, and instance masks
-        return image, cluster_mask , instance_mask , image_name
+        return image, cluster_mask , instance_mask , object_annotations , image_name
 
 
-    def create_masks(self, annotation):
+    def create_masks(self, annotation) :
         lane_clustered = np.zeros((720, 1280))
         drivable_clustered = np.zeros((720, 1280))
         lane_cluster_index = 0
         drivable_cluster_index = 0
+        obj_annot = np.array([])
         for label_info in annotation['labels']:
 
             category = label_info['category']
@@ -112,7 +113,32 @@ class CustomDataLoader:
                 drivable_cluster_index += 1
                 drivable_clustered += (drivable_area_mask/255)*drivable_cluster_index
 
-        return drivable_clustered ,lane_clustered
+            if category in self.class_mapping.keys():
+
+                class_index = self.class_mapping[category]
+
+                x1 = int(label_info['box2d']['x1'])//(1280/640)
+                y1 = int(label_info['box2d']['y1'])//(720/640)
+                x2 = int(label_info['box2d']['x2'])//(1280/640)
+                y2 = int(label_info['box2d']['y2'])//(720/640)
+
+                # Convert bounding box to YOLO format
+                box_center_x = (x1 + x2) / 2.0
+                box_center_y = (y1 + y2) / 2.0
+                box_width = x2 - x1
+                box_height = y2 - y1
+
+                xc, yc, wb, hb = self.format_yolo(
+                    [box_center_x, box_center_y, box_width, box_height])
+
+                obj_annot = np.array([class_index, xc, yc, wb, hb])
+
+        return drivable_clustered ,lane_clustered , obj_annot
+
+    def format_yolo(self, box):
+        xc, yc, wb, hb = box[0]/(640), box[1] / \
+            640, box[2]/640, box[3]/640
+        return xc, yc, wb, hb
 
     def max_pooling_2d(self , input_array, pool_size=(2, 2)):
 

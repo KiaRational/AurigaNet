@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 
-class CustomLoss(nn.Module):
+class InstanceLoss(nn.Module):
     def __init__(self):
         super(CustomLoss, self).__init__()
         self.p.feature_size = 4
         self.p.grid_x = 320
         self.p.grid_y = 320
-        
+        self.p.K1 = 1
     def forward(self, feature, ground_truth_instance):
         real_batch_size = feature.size(0)
         
@@ -29,4 +29,7 @@ class CustomLoss(nn.Module):
         disc_loss = torch.sum(disc_loss) / torch.sum(ground_truth_instance == 2)
 
         total_loss = sisc_loss + disc_loss
+        
         return total_loss
+
+

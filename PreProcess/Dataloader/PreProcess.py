@@ -172,9 +172,9 @@ class CustomDataLoader:
 
             if temp[i]>0:
 
-                gt_one[temp==temp[i]] = 1   #same instance
-                gt_one[temp!=temp[i]] = 2 #different instance, same class
-                gt_one[temp==0] = 3 #different instance, different class
+                gt_one[temp==temp[i]] = 1   # same instance
+                gt_one[temp!=temp[i]] = 2   # different instance, same class
+                gt_one[temp==0] = 3         # different instance, different class
                 ground[0][i] += gt_one
 
         return ground

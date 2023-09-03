@@ -1,6 +1,13 @@
 import torch 
 from torch import nn
 import numpy as np
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(project_root)
+
+from utils.Parameters import Parameters
+
+
 class ConvBNReLU(nn.Sequential):
     """
     A sequential module consisting of a convolutional layer, batch normalization, and ReLU activation.
@@ -221,6 +228,8 @@ class SegNeck(nn.Module):
 
     def __init__(self, out_channels_list , class_number):
         super(SegNeck,self).__init__()
+
+        self.p = Parameters()
         # BasicBlockB_S B is number of branch and S is number of stage
         self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
         self.BasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
@@ -248,7 +257,8 @@ class SegNeck(nn.Module):
 
         self.Output_Confidence  = Output(in_channels=np.sum(out_channels_list), out_channels= class_number )
 
-        self.Output_Instance    = Output(in_channels=np.sum(out_channels_list), out_channels = class_number)
+        self.Output_EmbeddingFeatureLane   = Output(in_channels=np.sum(out_channels_list), out_channels = self.p.feature_size)
+        self.Output_EmbeddingFeatureArea   = Output(in_channels=np.sum(out_channels_list), out_channels = self.p.feature_size)
 
     def forward(self, Half,Quarter,Octant,One_sixteenth):
         # -----------------------Stage 1------------------------
@@ -298,8 +308,10 @@ class SegNeck(nn.Module):
 
         Out_Confidence = self.Output_Confidence(Out_Confidence)
 
-        Out_Instance   = self.Output_Instance(Out_Instance)
+        Out_EmbeddingFeatureLane   = self.Output_EmbeddingFeatureLane(Out_Instance)
+
+        Out_EmbeddingFeatureArea   = self.Output_EmbeddingFeatureArea(Out_Instance)
 
 
-        return [Out_Confidence,Out_Instance]
+        return [Out_Confidence, torch.cat((Out_EmbeddingFeatureArea,Out_EmbeddingFeatureLane),dim=1)]  
 

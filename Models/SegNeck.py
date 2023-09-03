@@ -1,6 +1,6 @@
 import torch 
 from torch import nn
-
+import numpy as np
 class ConvBNReLU(nn.Sequential):
     """
     A sequential module consisting of a convolutional layer, batch normalization, and ReLU activation.
@@ -219,53 +219,36 @@ class SegNeck(nn.Module):
         Resize (int, optional): The factor by which the feature maps are resized. Default is 1.
     """
 
-<<<<<<< HEAD
-  def __init__(self, out_channels_list = out_channels_list , class_number = class_number):
-    super(SegNeck,self).__init__()
-    # BasicBlockB_S B is number of branch and S is number of stage
-    self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-    self.BasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-    self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-    self.BasicBlock1_3 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-    self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-    self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-    self.BasicBlock2_4 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-    self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
-    self.BasicBlock3_4 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
-    self.BasicBlock4_4 = BasicBlock(in_channels = out_channels_list[3] , out_channels = out_channels_list[3])
-    self.mixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
-    self.mixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
-    self.mixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
-
-    self.relu = nn.ReLU(inplace=False)
-    self.Fusing2 = FusionLayer(2,2,out_channels_list[0])
-    self.Fusing3 = FusionLayer(3,3,out_channels_list[0])
-    self.Fusing4 = FusionLayer(4,4,out_channels_list[0])
-    self.Output  = Output(in_channels=np.sum(out_channels),out_channels= class_number)
-=======
-    def __init__(self, Resize = 1):
+    def __init__(self, out_channels_list , class_number):
         super(SegNeck,self).__init__()
         # BasicBlockB_S B is number of branch and S is number of stage
-        self.BasicBlock1_1 = BasicBlock(in_channels = 64 , out_channels = 64//Resize)
-        self.BasicBlock1_4 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-        self.BasicBlock1_2 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-        self.BasicBlock1_3 = BasicBlock(in_channels = 64//Resize , out_channels = 64//Resize)
-        self.BasicBlock2_2 = BasicBlock(in_channels = 128 , out_channels = 128//Resize)
-        self.BasicBlock2_3 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-        self.BasicBlock2_4 = BasicBlock(in_channels = 128//Resize , out_channels = 128//Resize)
-        self.BasicBlock3_3 = BasicBlock(in_channels = 256 , out_channels = 256//Resize)
-        self.BasicBlock3_4 = BasicBlock(in_channels = 256//Resize , out_channels = 256//Resize)
-        self.BasicBlock4_4 = BasicBlock(in_channels = 512 , out_channels = 512//Resize)
-        self.mixUpsample2_4_2 = MixedUpsample(in_channels = 128//Resize , out_channels = 128//Resize , upsample_ratio=2)
-        self.mixUpsample3_4_4 = MixedUpsample(in_channels = 256//Resize , out_channels = 256//Resize , upsample_ratio=4)
-        self.mixUpsample4_4_8 = MixedUpsample(in_channels = 512//Resize , out_channels = 512//Resize , upsample_ratio=8)
+        self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+        self.BasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+        self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+        self.BasicBlock1_3 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+        self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+        self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+        self.BasicBlock2_4 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
+        self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
+        self.BasicBlock3_4 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
+        self.BasicBlock4_4 = BasicBlock(in_channels = out_channels_list[3] , out_channels = out_channels_list[3])
+        self.SecondBasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
+        self.mixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
+        self.mixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
+        self.mixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
+        
+        self.SecondmixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
+        self.SecondmixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
+        self.SecondmixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
 
         self.relu = nn.ReLU(inplace=False)
-        self.Fusing2 = FusionLayer(2,2,64//Resize)
-        self.Fusing3 = FusionLayer(3,3,64//Resize)
-        self.Fusing4 = FusionLayer(4,4,64//Resize)
-        self.Output  = Output(in_channels=480,out_channels=2)
->>>>>>> origin/main
+        self.Fusing2 = FusionLayer(2,2,out_channels_list[0])
+        self.Fusing3 = FusionLayer(3,3,out_channels_list[0])
+        self.Fusing4 = FusionLayer(4,4,out_channels_list[0])
+
+        self.Output_Confidence  = Output(in_channels=np.sum(out_channels_list), out_channels= class_number )
+
+        self.Output_Instance    = Output(in_channels=np.sum(out_channels_list), out_channels = class_number)
 
     def forward(self, Half,Quarter,Octant,One_sixteenth):
         # -----------------------Stage 1------------------------
@@ -298,12 +281,25 @@ class SegNeck(nn.Module):
         Branch1 , Branch2 , Branch3 , Branch4 = self.Fusing4([Branch1 , Branch2 , Branch3 , Branch4])
 
         # ------------------------Output------------------------
+
         Branch1 = self.BasicBlock1_4(Branch1)
         Branch2_1 = self.mixUpsample2_4_2(Branch2)
         Branch3_1 = self.mixUpsample3_4_4(Branch3)
         Branch4_1 = self.mixUpsample4_4_8(Branch4)
-        Out = torch.cat((Branch1,Branch2_1,Branch3_1 , Branch4_1),dim=1)
-        Out = self.Output(Out)
+        
+        SecondBranch1 = self.SecondBasicBlock1_4(Branch1)
+        SecondBranch2_1 = self.SecondmixUpsample2_4_2(Branch2)
+        SecondBranch3_1 = self.SecondmixUpsample3_4_4(Branch3)
+        SecondBranch4_1 = self.SecondmixUpsample4_4_8(Branch4)
 
-        return Out
+        
+        Out_Confidence = torch.cat((Branch1,Branch2_1,Branch3_1 , Branch4_1),dim=1)
+        Out_Instance   = torch.cat((SecondBranch1,SecondBranch2_1,SecondBranch3_1 , SecondBranch4_1),dim=1)
+
+        Out_Confidence = self.Output_Confidence(Out_Confidence)
+
+        Out_Instance   = self.Output_Instance(Out_Instance)
+
+
+        return [Out_Confidence,Out_Instance]
 

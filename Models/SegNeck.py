@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 
+import os 
+import sys
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
@@ -142,9 +144,9 @@ class BasicBlock(nn.Module):
 class Output(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Output, self).__init__()
-        self.conv1 = ConvBNReLU(in_channels, in_channels//2, 3, 1, 1)
-        self.conv2 = ConvBNReLU(in_channels//2, in_channels//4, 3, 1, 1)
-        self.conv3 = ConvBNReLU(in_channels//4, out_channels, 1, 0, 1)
+        self.conv1 = ConvBNReLU(in_channels, in_channels//4, 3, 1, 1)
+        self.conv2 = ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1)
+        self.conv3 = ConvBNReLU(in_channels//8, out_channels, 1, 0, 1)
 
     def forward(self, x):
         x = self.conv1(x)

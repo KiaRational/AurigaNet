@@ -54,7 +54,8 @@ class MultiNet(nn.Module):
 
         return Out
 
+if __name__ == "__main__":
 
-model = MultiNet()
-# torchinfo.summary(upsample_conv,(1,512, 20, 20))
-torchinfo.summary(model, (1, 3, 640, 640))
+    model = MultiNet()
+    # torchinfo.summary(upsample_conv,(1,512, 20, 20))
+    torchinfo.summary(model, (1, 3, 640, 640))

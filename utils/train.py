@@ -17,9 +17,14 @@ from Models.MultiNet import MultiNet
 from utils.Parameters import Parameters
 import utils.losses as Loss
 
+def train_step(model,dataloader,loss_fn,optimizer):
+
+    for i, (images, cluster_masks, instance_masks , objects_annotations ) in enumerate(train_data_loader):
+
+            continue
 
 
-def main(args):
+def train(args):
 
     P = Parameters()
     train_data_path = P.train_data_path
@@ -28,17 +33,50 @@ def main(args):
     val_label_path = P.val_label_path  
     save_path = P.save_path
     class_mapping = P.class_mapping
+    epochs = P.epoch_number
     num_workers = args.num_workers
     batch_size = args.batch_size
     shuffle = args.shuffle
 
+    results = {"train_loss": [],
+        "train_acc": [],
+        "val_loss": [],
+        "val_acc": []
+    }
     train_dataset = LabelGenerator(train_data_path, train_label_path, save_path ,image_size=(640, 640), normalize=True, class_mapping=class_mapping)
-    train_data_loader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
+    train_dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
 
     val_dataset = LabelGenerator(val_data_path, val_label_path, save_path ,image_size=(640, 640), normalize=True, class_mapping=class_mapping)
-    val_data_loader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
-   
+    val_dataloader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
 
+    model = MultiNet()
+
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
+
+    loss_fn = Loss.ComputeLoss()
+
+    model.train()
+
+    for epoch in tqdm(range(epochs)):    
+        train_loss = train_step(model=model,
+                                dataloader=train_dataloader,
+                                loss_fn=loss_fn,
+                                optimizer=optimizer)
+        
+
+        print(
+            f"Epoch: {epoch+1} | "
+            f"train_loss: {train_loss:.4f} | "
+            # f"train_acc: {train_acc:.4f} | "
+            f"test_loss: {val_loss:.4f} | "
+            # f"test_acc: {test_acc:.4f}"
+        )
+
+        # 5. Update results dictionary
+        results["train_loss"].append(train_loss)
+        # results["train_acc"].append(train_acc)
+        results["val_loss"].append(val_loss)
+        # results["test_acc"].append(test_acc)
     # for i, (image, cluster_mask, instance_mask , objects_annotations , image_name) in enumerate(tqdm(train_data_loader)):
        
     #     continue

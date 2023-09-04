@@ -71,9 +71,10 @@ class LabelGenerator(Dataset):
         image  , cluster_mask , instance_mask , objects_annotations, image_name = self.data_loader.process(annotation)
         
 
-        # image = image.transpose((2, 0, 1))
+        image = image.transpose((2, 0, 1))
 
-        return image, cluster_mask , instance_mask , objects_annotations , image_name
+
+        return image, cluster_mask , instance_mask , objects_annotations 
 
 
 class DataLoaderX(DataLoader):

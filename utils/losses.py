@@ -23,7 +23,7 @@ class EmbeddingLoss(nn.Module):
 
     def __init__(self):
 
-        super(CustomLoss, self).__init__()
+        super(EmbeddingLoss, self).__init__()
 
         self.p = Parameters()
 
@@ -45,7 +45,7 @@ class EmbeddingLoss(nn.Module):
 
         # Calculate different instance loss (Loss_Instance_0)
 
-        Loss_Instance_0 = torch.max([0,self.p.K1 - distancNorme_map[ground_truth_instance == 2]])
+        Loss_Instance_0 = torch.max([0,self.p.K1 - Norm[ground_truth_instance == 2]])
 
         Loss_Instance_0 = torch.sum(Loss_Instance_0) / torch.sum(ground_truth_instance == 2)
 
@@ -64,25 +64,26 @@ class EmbeddingLoss(nn.Module):
         return Loss
 
 
-
 class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceBCELoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-        
-        intersection = (inputs * targets).sum()                            
-        dice_loss = 1 - (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
+        # Apply softmax along the class dimension (dim=1)
+        inputs = F.softmax(inputs, dim=1)
+
+        # Flatten label and prediction tensors
+        batch_size, num_classes, height, width = inputs.size()
+        inputs = inputs.view(batch_size, num_classes, -1)
+        targets = targets.view(batch_size, -1)
+
+        intersection = (inputs * targets).sum(2)                            
+        dice_loss = 1 - (2.*intersection + smooth) / (inputs.sum(2) + targets.sum(1) + smooth)
+        dice_loss = dice_loss.mean()  # Average over batch
+
+        BCE = F.binary_cross_entropy(inputs, targets.unsqueeze(1), reduction='mean')
         Dice_BCE = BCE + dice_loss
-        
+
         return Dice_BCE
 
 
@@ -94,7 +95,7 @@ class BoundaryLoss1(nn.Module):
     https://arxiv.org/abs/1905.07852
     """
     def __init__(self, theta0=5, theta=11):
-        super().__init__()
+        super(BoundaryLoss1, self).__init__()
         self.theta0 = theta0
         self.theta = theta
 
@@ -139,4 +140,35 @@ class BoundaryLoss1(nn.Module):
         one_hot = torch.zeros(tensor.size(0), num_classes, *tensor.size()[1:]).to(tensor.device)
         one_hot.scatter_(1, tensor.unsqueeze(1), 1)
         return one_hot
+
+
+class ComputeLoss(nn.Module) :
+
+    def __init__(self):
+        super(ComputeLoss, self).__init__()
+        self.P = Parameters()
+        self.Segmentation_Confidence_Loss = DiceBCELoss()
+        self.Feature_Embedding_Loss = EmbeddingLoss()
+        
+    def forward(self, predictions , targets):
+
+        Pred_Confidence , Pred_EmbeddingFeatureArea , Pred_EmbeddingFeatureLane = predictions
+
+        GroundTruth_Confidence , GroundTruth_EmbeddingFeature = targets
+
+        GroundTruth_EmbeddingFeatureArea , GroundTruth_EmbeddingFeatureLane = GroundTruth_EmbeddingFeature
+
+
+        SegLoss = self.Segmentation_Confidence_Loss(Pred_Confidence,GroundTruth_Confidence)
+
+        AreaFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureArea,GroundTruth_EmbeddingFeatureArea)
+
+        LaneFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureLane,GroundTruth_EmbeddingFeatureLane)
+
+
+        TotalLoss = self.P.Alpha1 * SegLoss + self.P.Alpha2 * AreaFeatureLoss + self.P.Alpha3 * LaneFeatureLoss
+
+        return TotalLoss
+        
+        
 

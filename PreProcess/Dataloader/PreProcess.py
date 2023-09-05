@@ -80,10 +80,10 @@ class CustomDataLoader:
         instance_lane     = self.cluster_to_embedding_feature(lane_clustered_mask_pooled   ,   size=80)
 
         # Combine drivable and lane instance masks
-        instance_mask = np.stack([instance_drivable , instance_lane])
+        # instance_mask = np.stack([instance_drivable , instance_lane])
 
         # Return processed image, cluster masks, and instance masks
-        return image, cluster_mask , instance_mask , object_annotations , image_name
+        return image, cluster_mask , instance_drivable , instance_lane , object_annotations , image_name
 
 
     def create_masks(self, annotation) :

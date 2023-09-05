@@ -315,5 +315,5 @@ class SegNeck(nn.Module):
         Out_EmbeddingFeatureArea   = self.Output_EmbeddingFeatureArea(Out_Instance)
 
 
-        return [Out_Confidence, torch.cat((Out_EmbeddingFeatureArea,Out_EmbeddingFeatureLane),dim=1)]  
+        return [Out_Confidence, Out_EmbeddingFeatureArea , Out_EmbeddingFeatureLane]  
 

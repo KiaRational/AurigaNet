@@ -68,13 +68,15 @@ class LabelGenerator(Dataset):
 
         annotation = self.data_loader.annotations[index]
 
-        image  , cluster_mask , instance_mask , objects_annotations, image_name = self.data_loader.process(annotation)
+        image  , cluster_mask , instance_drivable , instance_lane , objects_annotations, image_name = self.data_loader.process(annotation)
         
 
         image = image.transpose((2, 0, 1))
 
-
-        return image, cluster_mask , instance_mask , objects_annotations 
+        confidence_mask = np.zeros_like(cluster_mask)
+        confidence_mask[cluster_mask>0]=1
+        
+        return image, confidence_mask , instance_drivable , instance_lane , objects_annotations 
 
 
 class DataLoaderX(DataLoader):

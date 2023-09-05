@@ -154,9 +154,8 @@ class ComputeLoss(nn.Module) :
 
         Pred_Confidence , Pred_EmbeddingFeatureArea , Pred_EmbeddingFeatureLane = predictions
 
-        GroundTruth_Confidence , GroundTruth_EmbeddingFeature = targets
+        GroundTruth_Confidence , GroundTruth_EmbeddingFeatureArea , GroundTruth_EmbeddingFeatureLane = targets
 
-        GroundTruth_EmbeddingFeatureArea , GroundTruth_EmbeddingFeatureLane = GroundTruth_EmbeddingFeature
 
 
         SegLoss = self.Segmentation_Confidence_Loss(Pred_Confidence,GroundTruth_Confidence)

@@ -16,8 +16,15 @@ from PreProcess.Dataloader import LabelGenerator, DataLoaderX
 from Models.MultiNet import MultiNet
 from utils.Parameters import Parameters
 import utils.losses as Loss
+from utils.accuracy import Accuracy
 
-def train_step(model,dataloader,loss_fn,optimizer,device):
+
+def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
+    total_loss = 0
+    total_f1_lane = 0
+    total_iou_drivable =0
+    total_iou_lane = 0
+    total_f1_drivable = 0
 
     for i, (images, confidence_mask, instance_drivable , instance_lane , objects_annotations ) in enumerate(dataloader):
 
@@ -32,14 +39,22 @@ def train_step(model,dataloader,loss_fn,optimizer,device):
 
         # Calculate loss
         loss = loss_fn(outputs, targets)
+        iou_acc_drivable = accuracy_fn.calculate_iou(targets[0][0],outputs[0][0])
+        iou_acc_lane = accuracy_fn.calculate_iou(targets[0][1],outputs[0][1])
+        f1_acc_drivable = accuracy_fn.calculate_f1_score(targets[0][0],outputs[0][0])
+        f1_acc_lane = accuracy_fn.calculate_f1_score(targets[0][1],outputs[0][1])
+
 
         # Backpropagation
         loss.backward()
         optimizer.step()
-
+        total_iou_lane += iou_acc_lane
+        total_iou_drivable += iou_acc_drivable
+        total_f1_lane += f1_acc_lane
+        total_f1_drivable += f1_acc_drivable
         total_loss += loss.item()
-
-    return total_loss / len(dataloader)
+        
+    return (total_loss / len(dataloader)) , (total_iou_drivable / len(dataloader)) ,(total_iou_lane / len(dataloader)) ,(total_f1_drivable / len(dataloader)) ,(total_f1_lane / len(dataloader)) 
 
 
 def train(args):
@@ -57,9 +72,13 @@ def train(args):
     shuffle = args.shuffle
     device = args.device
     # Create a dictionary to store results
-    results = {
-        "train_loss": [],
-        "val_loss": [],
+    results = {"train_loss": [],
+        "train_lane_f1_acc": [],
+        "train_lane_iou_acc": [],
+        "train_drivable_f1_acc": [],
+        "train_drivable_iou_acc": [],
+        "test_loss": [],
+        "test_acc": []
     }
 
     # Initialize training dataset and dataloader
@@ -76,26 +95,37 @@ def train(args):
     # Initialize optimizer and loss function
     optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
     loss_fn = Loss.ComputeLoss()
-
+    accuracy_fn = Accuracy()
     # Training loop
     for epoch in tqdm(range(epochs)):
         model.train()  # Set model in training mode
 
-        train_loss = train_step(model=model,
-                                dataloader=train_dataloader,
-                                loss_fn=loss_fn,
-                                optimizer=optimizer
-                                ,device = device)
+        train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,
+                                                                                                                            dataloader=train_dataloader,
+                                                                                                                            loss_fn=loss_fn,
+                                                                                                                            accuracy_fn = accuracy_fn,
+                                                                                                                            optimizer=optimizer
+                                                                                                                            ,device = device)
 
         print(
             f"Epoch: {epoch+1} | "
             f"train_loss: {train_loss:.4f} | "
+            f"train_drivable_iou_acc: {train_drivable_iou_acc:.4f} | "
+            f"train_lane_iou_acc: {train_lane_iou_acc:.4f} | "
+            f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
+            f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
         )
 
         # Update results dictionary
         results["train_loss"].append(train_loss)
+        results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
+        results["train_lane_iou_acc"].append(train_lane_iou_acc)
+        results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
+        results["train_lane_f1_acc"].append(train_lane_f1_acc)
 
     print("Training complete")
+    return results , model
+
 
 if __name__ == "__main__":
     print('''
@@ -118,4 +148,4 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size.")
     parser.add_argument("--shuffle", action="store_true",default=False, help="Shuffle the data.")
     args = parser.parse_args()
-    train(args)
+    results , model = train(args)

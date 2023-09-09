@@ -45,7 +45,7 @@ class EmbeddingLoss(nn.Module):
 
         # Calculate different instance loss (Loss_Instance_0)
 
-        Loss_Instance_0 = torch.max([0,self.p.K1 - Norm[ground_truth_instance == 2]])
+        Loss_Instance_0 = torch.max(torch.zeros_like(Norm[ground_truth_instance == 2]), self.p.K1 - Norm[ground_truth_instance == 2])
 
         Loss_Instance_0 = torch.sum(Loss_Instance_0) / torch.sum(ground_truth_instance == 2)
 
@@ -73,19 +73,21 @@ class DiceBCELoss(nn.Module):
         inputs = F.softmax(inputs, dim=1)
 
         # Flatten label and prediction tensors
-        batch_size, num_classes, height, width = inputs.size()
-        inputs = inputs.view(batch_size, num_classes, -1)
-        targets = targets.view(batch_size, -1)
+        inputs_flat = inputs.view(inputs.size(0), -1)
+        targets_flat = targets.view(targets.size(0), -1)
 
-        intersection = (inputs * targets).sum(2)                            
-        dice_loss = 1 - (2.*intersection + smooth) / (inputs.sum(2) + targets.sum(1) + smooth)
-        dice_loss = dice_loss.mean()  # Average over batch
+        # Calculate Dice loss
+        intersection = (inputs_flat * targets_flat).sum(dim=1)
+        dice_loss = 1 - (2 * intersection + smooth) / (inputs_flat.sum(dim=1) + targets_flat.sum(dim=1) + smooth)
+        dice_loss = dice_loss.mean()  # Average over the batch
 
-        BCE = F.binary_cross_entropy(inputs, targets.unsqueeze(1), reduction='mean')
-        Dice_BCE = BCE + dice_loss
+        # Calculate BCE loss
+        bce_loss = F.binary_cross_entropy(inputs, targets.unsqueeze(1), reduction='mean')
 
-        return Dice_BCE
+        # Combine Dice and BCE losses
+        combined_loss = dice_loss + bce_loss
 
+        return combined_loss
 
 
 

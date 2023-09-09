@@ -55,7 +55,6 @@ class LabelGenerator(Dataset):
 
         required_space = self.calculate_disk_space(num_samples)
         available_space = shutil.disk_usage(save_dir).free
-        print(required_space,available_space)
         if required_space > available_space:
             raise ValueError(" ⚠️ Not enough disk space available for saving the data! ")
 

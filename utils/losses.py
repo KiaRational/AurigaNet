@@ -30,7 +30,6 @@ class EmbeddingLoss(nn.Module):
     def forward(self, feature, ground_truth_instance):
 
         real_batch_size = feature.size(0)
-        
         F_SIM_i = feature.view(real_batch_size, self.p.feature_size, 1, self.p.grid_y * self.p.grid_x)
         F_SIM_i = F_SIM_i.expand(real_batch_size, self.p.feature_size, self.p.grid_y * self.p.grid_x, self.p.grid_y * self.p.grid_x).detach()
         
@@ -63,32 +62,35 @@ class EmbeddingLoss(nn.Module):
 
         return Loss
 
-
 class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceBCELoss, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        # Apply softmax along the class dimension (dim=1)
-        inputs = F.softmax(inputs, dim=1)
-
-        # Flatten label and prediction tensors
-        inputs_flat = inputs.view(inputs.size(0), -1)
-        targets_flat = targets.view(targets.size(0), -1)
-
-        # Calculate Dice loss
-        intersection = (inputs_flat * targets_flat).sum(dim=1)
-        dice_loss = 1 - (2 * intersection + smooth) / (inputs_flat.sum(dim=1) + targets_flat.sum(dim=1) + smooth)
-        dice_loss = dice_loss.mean()  # Average over the batch
-
-        # Calculate BCE loss
-        bce_loss = F.binary_cross_entropy(inputs, targets.unsqueeze(1), reduction='mean')
-
-        # Combine Dice and BCE losses
-        combined_loss = dice_loss + bce_loss
-
+        self.BCE = nn.BCELoss(weight, size_average)
+    
+    def forward(self, inputs, targets):
+        # Cast inputs and targets to the same data type (e.g., torch.float32)
+        inputs = inputs.to('cuda',torch.float32)
+        targets = targets.to('cuda',torch.float32)
+        
+        # Flatten the inputs and targets to be of shape (batch_size, class_size, -1)
+        inputs = inputs.view(inputs.size(0), inputs.size(1), -1)
+        targets = targets.view(targets.size(0), targets.size(1), -1)
+        
+        # Compute Binary Cross-Entropy Loss
+        bce_loss = self.BCE(inputs, targets)
+        
+        # Compute Dice Coefficient
+        intersection = torch.sum(inputs * targets, dim=(0, 2))
+        union = torch.sum(inputs, dim=(0, 2)) + torch.sum(targets, dim=(0, 2))
+        dice_coeff = (2.0 * intersection + 1e-5) / (union + 1e-5)
+        
+        # Compute Dice Loss
+        dice_loss = 1.0 - dice_coeff.mean()
+        
+        # Combine BCE and Dice Loss (you can adjust the weighting factor)
+        combined_loss = bce_loss + dice_loss
+        
         return combined_loss
-
 
 
 class BoundaryLoss1(nn.Module):
@@ -149,7 +151,7 @@ class ComputeLoss(nn.Module) :
     def __init__(self):
         super(ComputeLoss, self).__init__()
         self.P = Parameters()
-        self.Segmentation_Confidence_Loss = DiceBCELoss()
+        self.Segmentation_Confidence_Loss = nn.BCEWithLogitsLoss(reduction="mean")#DiceBCELoss()
         self.Feature_Embedding_Loss = EmbeddingLoss()
         
     def forward(self, predictions , targets):

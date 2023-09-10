@@ -27,11 +27,9 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     total_f1_drivable = 0
 
     for i, (images, confidence_mask, instance_drivable , instance_lane , objects_annotations ) in enumerate(dataloader):
-
         # Zero the gradients
         targets = [confidence_mask.to(device),instance_drivable.to(device),instance_lane.to(device)]
         inputs = images.to(device)
-
         optimizer.zero_grad()
 
         # Forward pass
@@ -39,10 +37,10 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
 
         # Calculate loss
         loss = loss_fn(outputs, targets)
-        iou_acc_drivable = accuracy_fn.calculate_iou(targets[0][0],outputs[0][0])
-        iou_acc_lane = accuracy_fn.calculate_iou(targets[0][1],outputs[0][1])
-        f1_acc_drivable = accuracy_fn.calculate_f1_score(targets[0][0],outputs[0][0])
-        f1_acc_lane = accuracy_fn.calculate_f1_score(targets[0][1],outputs[0][1])
+        iou_acc_drivable = accuracy_fn.calculate_iou(targets[0][:,0,:,:],outputs[0][:,0,:,:])
+        iou_acc_lane = accuracy_fn.calculate_iou(targets[0][:,1,:,:],outputs[0][:,1,:,:])
+        f1_acc_drivable = accuracy_fn.calculate_f1_score(targets[0][:,0,:,:],outputs[0][:,0,:,:])
+        f1_acc_lane = accuracy_fn.calculate_f1_score(targets[0][:,1,:,:],outputs[0][:,1,:,:])
 
 
         # Backpropagation

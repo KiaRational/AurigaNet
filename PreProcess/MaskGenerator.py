@@ -27,7 +27,7 @@ class LabelGenerator(Dataset):
         self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping)
 
         self.image_size = image_size
-        if Train:
+        if train:
             self.save_dir = save_dir + "/train/"
         else:
             self.save_dir = save_dir + "/val/"
@@ -127,13 +127,13 @@ def main():
     for i, (run) in enumerate(tqdm(train_data_loader)):
         
         continue
-    pritn("Generating Train Mask Label Done")
+    print("Generating Train Mask Label Done")
 
     for i, (run) in enumerate(tqdm(val_data_loader)):
         
         continue
 
-    pritn("Generating Validation Mask Label Done")
+    print("Generating Validation Mask Label Done")
 
 if __name__ == "__main__":
 

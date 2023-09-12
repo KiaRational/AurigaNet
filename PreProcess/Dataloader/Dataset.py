@@ -8,26 +8,8 @@ import json
 import matplotlib.pyplot as plt
 # import albumentations as A
 import shutil
-from .PreProcess import CustomDataLoader
+from .Preprocess import CustomDataLoader
 
-# only for test
-def max_pooling_2d( input_array, pool_size=(2, 2),Type = "max"):
-    
-    input_height, input_width = input_array.shape
-    output_height = input_height // pool_size[0]
-    output_width = input_width // pool_size[1]
-
-    # Reshape input_array to be divided into pool_size blocks
-    reshaped_array = input_array[:output_height*pool_size[0], :output_width*pool_size[1]].reshape(
-        output_height, pool_size[0], output_width, pool_size[1]
-    )
-
-    # Apply max pooling using numpy's max function along specified axes
-    if Type == "max":
-        pooled_array = reshaped_array.max(axis=(1, 3))
-    if Type == "avg":
-        pooled_array = reshaped_array.mean(axis=(1, 3)).astype(int)
-    return pooled_array
 
 class LabelGenerator(Dataset):
     def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None):
@@ -67,15 +49,20 @@ class LabelGenerator(Dataset):
 
         annotation = self.data_loader.annotations[index]
 
-        image  , cluster_mask , instance_drivable , instance_lane , objects_annotations, image_name = self.data_loader.process(annotation)
+        image  , cluster_mask , instance_drivable  , objects_annotations = self.data_loader.process(annotation)
         
-
+        # image = np.zeros((640,640,3),np.uint8)
+        # cluster_mask = np.zeros((2,320,320),np.uint8)
+        # instance_drivable = np.zeros((6400,6400),np.uint8)
+        # instance_lane = np.zeros((6400,6400),np.uint8)
+        # objects_annotations = []
         image = image.transpose((2, 0, 1))
 
         confidence_mask = np.zeros_like(cluster_mask)
+
         confidence_mask[cluster_mask>0]=1
         
-        return image, confidence_mask , instance_drivable , instance_lane , objects_annotations 
+        return image, confidence_mask , instance_drivable , objects_annotations 
 
 
 class DataLoaderX(DataLoader):

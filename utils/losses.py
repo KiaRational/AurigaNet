@@ -156,9 +156,9 @@ class ComputeLoss(nn.Module) :
         
     def forward(self, predictions , targets):
 
-        Pred_Confidence , Pred_EmbeddingFeatureArea , Pred_EmbeddingFeatureLane = predictions
+        Pred_Confidence , Pred_EmbeddingFeatureArea = predictions
 
-        GroundTruth_Confidence , GroundTruth_EmbeddingFeatureArea , GroundTruth_EmbeddingFeatureLane = targets
+        GroundTruth_Confidence , GroundTruth_EmbeddingFeatureArea = targets
 
 
 
@@ -166,10 +166,8 @@ class ComputeLoss(nn.Module) :
 
         AreaFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureArea,GroundTruth_EmbeddingFeatureArea)
 
-        LaneFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureLane,GroundTruth_EmbeddingFeatureLane)
 
-
-        TotalLoss = self.P.Alpha1 * SegLoss + self.P.Alpha2 * AreaFeatureLoss + self.P.Alpha3 * LaneFeatureLoss
+        TotalLoss = self.P.Alpha1 * SegLoss + self.P.Alpha2 * AreaFeatureLoss 
 
         return TotalLoss
         

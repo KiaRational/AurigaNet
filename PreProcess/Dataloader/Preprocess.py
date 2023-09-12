@@ -5,23 +5,28 @@ import json
 import matplotlib.pyplot as plt
 import time
 from copy import deepcopy
+import torch
+import sys
 
 from .CreatMask import poly2ds_to_mask ,  ImageSize
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(project_root)
+
+from utils.Parameters import Parameters
 
 
 class CustomDataLoader:
     def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None):
         self.data_path = data_path
+        self.p = Parameters()
         self.image_size = image_size
         self.normalize = normalize
         self.class_mapping = class_mapping
         self.label_path = label_path
         self.annotations = self.load_data()
         self.num_samples = len(self.annotations)
-
-        # self.fig = plt.figure(facecolor="0")
-        # self.fig.set_size_inches(1280 / self.fig.get_dpi(), 720 / self.fig.get_dpi())
-        # self.ax = self.fig.add_axes([0, 0, 1, 1])
+        self.device = "cuda"
 
     def load_data(self):
         json_file_path = os.path.join(self.label_path)
@@ -52,14 +57,22 @@ class CustomDataLoader:
         # Get image name and path from the annotation
         image_name = annotation['name']
         image_path = os.path.join(self.data_path, image_name)
+        lane_mask_path = os.path.join(self.p.Lane_Mask_path,image_name)
+        area_mask_path = os.path.join(self.p.Area_Mask_path,image_name)
 
         # Read and convert the image to RGB format
         image = cv2.imread(image_path)
+        lane_clustered_mask = cv2.imread(lane_mask_path)
+        drivable_clustered_mask =  cv2.imread(area_mask_path)
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        lane_clustered_mask = cv2.cvtColor(lane_clustered_mask, cv2.COLOR_BGR2GRAY)
+        drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
 
-        # Create drivable and lane cluster masks
-        drivable_clustered_mask , lane_clustered_mask , object_annotations = self.create_masks(annotation)#self.create_masks(self.fig, self.ax, annotation)
+        lane_clustered_mask = (lane_clustered_mask//255).astype(np.uint8)
+        drivable_clustered_mask = (drivable_clustered_mask // 255).astype(np.uint8)
 
+        object_annotations = []
         # Resize and normalize the image
         image = self.resize_image(image)
         image = self.normalize_image(image)
@@ -68,50 +81,53 @@ class CustomDataLoader:
         lane_clustered_mask = self.resize_mask(lane_clustered_mask)
         drivable_clustered_mask = self.resize_mask(drivable_clustered_mask)
 
-        # Combine drivable and lane cluster masks
-        cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask])
+        cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
-        # Apply max pooling twice to drivable and lane cluster masks
         drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask))
         lane_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(lane_clustered_mask))
 
         # Convert cluster masks to instance masks using embedding feature
         instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=80) 
-        instance_lane     = self.cluster_to_embedding_feature(lane_clustered_mask_pooled   ,   size=80)
 
-        # Combine drivable and lane instance masks
-        # instance_mask = np.stack([instance_drivable , instance_lane])
+        object_annotations = self.create_masks(annotation,False)
 
         # Return processed image, cluster masks, and instance masks
-        return image, cluster_mask , instance_drivable , instance_lane , object_annotations , image_name
+
+        return image  , cluster_mask , instance_drivable , object_annotations 
 
 
-    def create_masks(self, annotation) :
+    def create_masks(self, annotation , CreateMasks = True ) :
         lane_clustered = np.zeros((720, 1280))
         drivable_clustered = np.zeros((720, 1280))
-        lane_cluster_index = 0
-        drivable_cluster_index = 0
+        lane_cluster_index = 1
+        drivable_cluster_index = 1
         obj_annot = np.array([])
         for label_info in annotation['labels']:
-
+            
             category = label_info['category']
 
             if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
+                
+                if CreateMasks:
 
-                poly2d = label_info['poly2d']
-                image_size = ImageSize(width=1280, height=720)
-                lane_mask = poly2ds_to_mask(image_size, poly2d)  # Pass fig and ax here
+                    poly2d = label_info['poly2d']
 
-                lane_cluster_index += 1
-                lane_clustered += (lane_mask/255)*lane_cluster_index
+                    image_size = ImageSize(width=1280, height=720)
+                    lane_mask = poly2ds_to_mask(image_size, poly2d)
+                    # Identify zero elements in lane_clustered
+                    zero_elements = lane_clustered == 0
+
+                    # Add (lane_mask/255)*lane_cluster_index to zero elements
+                    lane_clustered[zero_elements] += (lane_mask[zero_elements]/255) * lane_cluster_index
+
 
             if category == 'drivable area':
-
-                poly2d = label_info['poly2d']
-                image_size = ImageSize(width=1280, height=720)
-                drivable_area_mask = poly2ds_to_mask(image_size, poly2d)  # Pass fig and ax here
-                drivable_cluster_index += 1
-                drivable_clustered += (drivable_area_mask/255)*drivable_cluster_index
+                if CreateMasks:
+                    poly2d = label_info['poly2d']
+                    image_size = ImageSize(width=1280, height=720)
+                    drivable_area_mask = poly2ds_to_mask(image_size, poly2d)  
+                    drivable_clustered += (drivable_area_mask/255)*drivable_cluster_index
+                    drivable_cluster_index += 1
 
             if category in self.class_mapping.keys():
 
@@ -132,14 +148,35 @@ class CustomDataLoader:
                     [box_center_x, box_center_y, box_width, box_height])
 
                 obj_annot = np.array([class_index, xc, yc, wb, hb])
-
-        return drivable_clustered ,lane_clustered , obj_annot
-
+        if CreateMasks:
+            return drivable_clustered , drivable_cluster_index ,lane_clustered , lane_cluster_index , obj_annot
+        else:
+            return obj_annot
     def format_yolo(self, box):
         xc, yc, wb, hb = box[0]/(640), box[1] / \
             640, box[2]/640, box[3]/640
         return xc, yc, wb, hb
 
+    def calculate_iou(self,mask1, mask2):
+        """
+        Calculate Intersection over Union (IoU) between two binary masks.
+
+        Parameters:
+        - mask1: NumPy array representing the first binary mask (0 or 1).
+        - mask2: NumPy array representing the second binary mask (0 or 1).
+
+        Returns:
+        - iou: IoU score between the two masks, a value between 0 and 1.
+        """
+        intersection = np.logical_and(mask1, mask2).sum()
+        union = np.logical_or(mask1, mask2).sum()
+
+        if union == 0:
+            iou = 0.0
+        else:
+            iou = intersection / union
+
+        return iou
     def max_pooling_2d(self , input_array, pool_size=(2, 2)):
 
         input_height, input_width = input_array.shape
@@ -157,25 +194,23 @@ class CustomDataLoader:
         return pooled_array
 
 
-    def cluster_to_embedding_feature(self, cluster_mask , size):
+    def cluster_to_embedding_feature(self,cluster_mask, size):
         
-        temp = cluster_mask
+        dimensions = size ** 2
 
-        dimensions = size**2
+        cluster_mask = torch.from_numpy(cluster_mask.flatten()).to('cuda')
+        ground = torch.zeros((1, dimensions, dimensions), dtype=torch.int32, device='cuda')
 
-        ground = np.zeros((1, dimensions , dimensions))
+        # Create a 2D mask for the same instance condition
+        same_instance_mask = (cluster_mask.unsqueeze(1) == cluster_mask)
 
-        for i in range(dimensions): # make feature embedding ground truth 
+        # Create a 2D mask for different instance, same class condition
+        diff_instance_same_class_mask = ~same_instance_mask & (cluster_mask.unsqueeze(1) != 0)
 
-            temp = temp.flatten()
-            gt_one = deepcopy(temp)
-
-            if temp[i]>0:
-
-                gt_one[temp==temp[i]] = 1   # same instance
-                gt_one[temp!=temp[i]] = 2   # different instance, same class
-                gt_one[temp==0] = 3         # different instance, different class
-                ground[0][i] += gt_one
+        # Assign values based on conditions
+        ground[0][same_instance_mask] = 1  # same instance
+        ground[0][diff_instance_same_class_mask] = 2  # different instance, same class
+        ground[0][cluster_mask == 0] = 3  # different instance, different class
 
         return ground
 

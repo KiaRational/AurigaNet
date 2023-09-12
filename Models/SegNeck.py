@@ -257,9 +257,7 @@ class SegNeck(nn.Module):
         self.Fusing3 = FusionLayer(3,3,out_channels_list[0])
         self.Fusing4 = FusionLayer(4,4,out_channels_list[0])
         self.Output_Confidence  = Output(in_channels=np.sum(out_channels_list), out_channels= class_number )
-        self.DownOut_Lane = DownsampleConv(in_channels=np.sum(out_channels_list),out_channels=np.sum(out_channels_list),downsample_ratio=4)
         self.DownOut_Area = DownsampleConv(in_channels=np.sum(out_channels_list),out_channels=np.sum(out_channels_list),downsample_ratio=4)
-        self.Output_EmbeddingFeatureLane   = Output(in_channels=np.sum(out_channels_list), out_channels = self.p.feature_size)
         self.Output_EmbeddingFeatureArea   = Output(in_channels=np.sum(out_channels_list), out_channels = self.p.feature_size)
 
     def forward(self, Half,Quarter,Octant,One_sixteenth):
@@ -311,11 +309,8 @@ class SegNeck(nn.Module):
         Out_Confidence = self.Output_Confidence(Out_Confidence)
 
         Out_EmbeddingFeatureArea = self.DownOut_Area(Out_Instance)
-        Out_EmbeddingFeatureLane = self.DownOut_Lane(Out_Instance)
-
-        Out_EmbeddingFeatureLane   = self.Output_EmbeddingFeatureLane(Out_EmbeddingFeatureArea)
 
         Out_EmbeddingFeatureArea   = self.Output_EmbeddingFeatureArea(Out_EmbeddingFeatureArea)
 
-        return [Out_Confidence, Out_EmbeddingFeatureArea , Out_EmbeddingFeatureLane]  
+        return [Out_Confidence, Out_EmbeddingFeatureArea ]  
 

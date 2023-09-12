@@ -12,7 +12,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 # Import specific modules
-from PreProcess.Dataloader import LabelGenerator, DataLoaderX
+from PreProcess.Dataloader.Dataset import LabelGenerator, DataLoaderX
 from Models.MultiNet import MultiNet
 from utils.Parameters import Parameters
 import utils.losses as Loss
@@ -26,9 +26,9 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     total_iou_lane = 0
     total_f1_drivable = 0
 
-    for i, (images, confidence_mask, instance_drivable , instance_lane , objects_annotations ) in enumerate(dataloader):
+    for i, (images, confidence_mask, instance_drivable , objects_annotations ) in enumerate(dataloader):
         # Zero the gradients
-        targets = [confidence_mask.to(device),instance_drivable.to(device),instance_lane.to(device)]
+        targets = [confidence_mask.to(device),instance_drivable.to(device)]
         inputs = images.to(device)
         optimizer.zero_grad()
 
@@ -88,39 +88,40 @@ def train(args):
     val_dataloader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
 
     # Initialize model
-    model = MultiNet().to(device)
+    # model = MultiNet().to(device)
 
     # Initialize optimizer and loss function
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
-    loss_fn = Loss.ComputeLoss()
-    accuracy_fn = Accuracy()
+    # optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
+    # loss_fn = Loss.ComputeLoss()
+    # accuracy_fn = Accuracy()
     # Training loop
-    for epoch in tqdm(range(epochs)):
-        model.train()  # Set model in training mode
+    # for epoch in tqdm(range(epochs)):
+        # model.train()  # Set model in training mode
+    for i, (images, confidence_mask, instance_drivable  , objects_annotations ) in enumerate(tqdm(train_dataloader)):
 
-        train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,
-                                                                                                                            dataloader=train_dataloader,
-                                                                                                                            loss_fn=loss_fn,
-                                                                                                                            accuracy_fn = accuracy_fn,
-                                                                                                                            optimizer=optimizer
-                                                                                                                            ,device = device)
+        # train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,
+        #                                                                                                                     dataloader=train_dataloader,
+        #                                                                                                                     loss_fn=loss_fn,
+        #                                                                                                                     accuracy_fn = accuracy_fn,
+        #                                                                                                                     optimizer=optimizer
+        #                                                                                                                     ,device = device)
 
-        print(
-            f"Epoch: {epoch+1} | "
-            f"train_loss: {train_loss:.4f} | "
-            f"train_drivable_iou_acc: {train_drivable_iou_acc:.4f} | "
-            f"train_lane_iou_acc: {train_lane_iou_acc:.4f} | "
-            f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
-            f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
-        )
+        # print(
+        #     f"Epoch: {epoch+1} | "
+        #     f"train_loss: {train_loss:.4f} | "
+        #     f"train_drivable_iou_acc: {train_drivable_iou_acc:.4f} | "
+        #     f"train_lane_iou_acc: {train_lane_iou_acc:.4f} | "
+        #     f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
+        #     f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
+        # )
 
-        # Update results dictionary
-        results["train_loss"].append(train_loss)
-        results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
-        results["train_lane_iou_acc"].append(train_lane_iou_acc)
-        results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
-        results["train_lane_f1_acc"].append(train_lane_f1_acc)
-
+        # # Update results dictionary
+        # results["train_loss"].append(train_loss)
+        # results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
+        # results["train_lane_iou_acc"].append(train_lane_iou_acc)
+        # results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
+        # results["train_lane_f1_acc"].append(train_lane_f1_acc)
+        continue
     print("Training complete")
     return results , model
 

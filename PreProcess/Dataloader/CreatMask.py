@@ -113,7 +113,7 @@ def poly_to_patch(
         Path(points, codes),
         facecolor=color if closed else "none",
         edgecolor=color,
-        lw=0 if closed else 1,
+        lw=0 if closed else 4,
         alpha=1,
         antialiased=False,
         snap=True,

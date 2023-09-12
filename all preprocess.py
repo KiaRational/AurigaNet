@@ -233,27 +233,110 @@ class CustomDataset(Dataset):
 
         return batch_images, batch_drivable_masks, batch_lane_masks
 
-# Usage
-data_path = "/content/dataset/bdd100k/bdd100k/images/100k/train/"
-label_path = '/content/dataset/bdd100k_labels_release/bdd100k/labels/'
-class_mapping = {
-    'traffic_light': 0,
-    'traffic_sign': 1,
-    'car': 2
-}
-dataset = CustomDataset(data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=class_mapping)
-batch_size = 8  # Choose your desired batch size
-train_data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1)
+# # Usage
+# data_path = "/content/dataset/bdd100k/bdd100k/images/100k/train/"
+# label_path = '/content/dataset/bdd100k_labels_release/bdd100k/labels/'
+# class_mapping = {
+#     'traffic_light': 0,
+#     'traffic_sign': 1,
+#     'car': 2
+# }
+# dataset = CustomDataset(data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=class_mapping)
+# batch_size = 8  # Choose your desired batch size
+# train_data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1)
 
-# Example of how to iterate through the data loader during training
-for i, (batch_images, drivable_masks, lane_masks) in enumerate(train_data_loader):
-    # Here you can use the batch_images, drivable_masks, and lane_masks for training
-    # Remember that the batch size is determined by the 'batch_size' parameter you set above
-    # Perform your training process here
-    try:
-        print(batch_images.shape)
-        print(drivable_masks.shape)
-        print(lane_masks.shape)
-        print(i * batch_size)  # Print the starting index of each batch
-    except:
-        continue
+# # Example of how to iterate through the data loader during training
+# for i, (batch_images, drivable_masks, lane_masks) in enumerate(train_data_loader):
+#     # Here you can use the batch_images, drivable_masks, and lane_masks for training
+#     # Remember that the batch size is determined by the 'batch_size' parameter you set above
+#     # Perform your training process here
+#     try:
+#         print(batch_images.shape)
+#         print(drivable_masks.shape)
+#         print(lane_masks.shape)
+#         print(i * batch_size)  # Print the starting index of each batch
+#     except:
+#         continue
+
+cluster_mask = np.array(([16,8,7,4],
+                        [1,4,7,8],
+                        [1,16,11,12],
+                        [13,14,16,16]))
+
+# def cluster_to_embedding_feature(cluster_mask, size):
+
+#     dimensions = size ** 2
+
+#     ground = np.zeros((1, dimensions, dimensions))
+
+#     cluster_mask = cluster_mask.flatten()
+
+#     for i in range(dimensions):
+
+#         gt_one = cluster_mask.copy()
+
+#         gt_one[cluster_mask == cluster_mask[i]] = 1  # same instance
+#         gt_one[cluster_mask != cluster_mask[i]] = 2  # different instance, same class
+#         gt_one[cluster_mask == 0] = 3  # different instance, different class
+#         print(gt_one)
+#         ground[0][i] += gt_one
+
+#     return ground
+
+# def cluster_to_embedding_feature(cluster_mask, size):
+#     dimensions = size ** 2
+
+#     cluster_mask = cluster_mask.flatten()
+#     ground = np.zeros((1, dimensions, dimensions), dtype=np.int32)
+
+#     # Create a 2D mask for the same instance condition
+#     same_instance_mask = (cluster_mask[:, None] == cluster_mask)
+
+#     # Create a 2D mask for different instance, same class condition
+#     diff_instance_same_class_mask = ~same_instance_mask & (cluster_mask[:, None] != 0)
+
+#     # Assign values based on conditions
+#     ground[0][same_instance_mask] = 1  # same instance
+#     ground[0][diff_instance_same_class_mask] = 2  # different instance, same class
+#     ground[0][cluster_mask == 0] = 3  # different instance, different class
+
+#     return ground
+
+def cluster_to_embedding_feature(cluster_mask, size):
+    dimensions = size ** 2
+
+    cluster_mask = torch.from_numpy(cluster_mask.flatten()).to('cuda')
+    ground = torch.zeros((1, dimensions, dimensions), dtype=torch.int32, device='cuda')
+
+    # Create a 2D mask for the same instance condition
+    same_instance_mask = (cluster_mask.unsqueeze(1) == cluster_mask)
+
+    # Create a 2D mask for different instance, same class condition
+    diff_instance_same_class_mask = ~same_instance_mask & (cluster_mask.unsqueeze(1) != 0)
+
+    # Assign values based on conditions
+    ground[0][same_instance_mask] = 1  # same instance
+    ground[0][diff_instance_same_class_mask] = 2  # different instance, same class
+    ground[0][cluster_mask == 0] = 3  # different instance, different class
+
+    return ground
+
+
+# Example usage
+size = 4
+# cluster_mask = np.array([[1, 1, 2, 0],
+#                          [1, 1, 0, 3],
+#                          [4, 0, 0, 3],
+#                          [4, 5, 5, 0]])
+cluster_mask = np.array(([16,8,7,4],
+                        [1,4,7,8],
+                        [1,16,11,12],
+                        [13,14,16,16]))
+
+result = cluster_to_embedding_feature(cluster_mask, size)
+print(result)
+# res = cluster_to_embedding_feature(cluster_mask,4)
+# print(res)
+res = result.to('cpu').numpy()
+plt.imshow(res[0])
+plt.show()

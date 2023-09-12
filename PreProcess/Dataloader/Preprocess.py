@@ -17,7 +17,7 @@ from utils.Parameters import Parameters
 
 
 class CustomDataLoader:
-    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None):
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True):
         self.data_path = data_path
         self.p = Parameters()
         self.image_size = image_size
@@ -27,7 +27,7 @@ class CustomDataLoader:
         self.annotations = self.load_data()
         self.num_samples = len(self.annotations)
         self.device = "cuda"
-
+        self.train = train
     def load_data(self):
         json_file_path = os.path.join(self.label_path)
         with open(json_file_path, 'r') as f:
@@ -57,9 +57,13 @@ class CustomDataLoader:
         # Get image name and path from the annotation
         image_name = annotation['name']
         image_path = os.path.join(self.data_path, image_name)
-        lane_mask_path = os.path.join(self.p.Lane_Mask_path,image_name)
-        area_mask_path = os.path.join(self.p.Area_Mask_path,image_name)
-
+        if self.train:
+            lane_mask_path = os.path.join(self.p.train_Lane_Mask_path,image_name)
+            area_mask_path = os.path.join(self.p.train_Area_Mask_path,image_name)
+        else:
+            lane_mask_path = os.path.join(self.p.val_Lane_Mask_path,image_name)
+            area_mask_path = os.path.join(self.p.val_Area_Mask_path,image_name)
+            
         # Read and convert the image to RGB format
         image = cv2.imread(image_path)
         lane_clustered_mask = cv2.imread(lane_mask_path)

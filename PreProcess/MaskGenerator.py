@@ -17,19 +17,21 @@ sys.path.append(project_root)
 
 from PreProcess.Dataloader.Preprocess import CustomDataLoader
 
-
 from utils.Parameters import Parameters
 
 
 class LabelGenerator(Dataset):
 
-    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None):
+    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None,train=True):
 
         self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping)
 
         self.image_size = image_size
+        if Train:
+            self.save_dir = save_dir + "/train/"
+        else:
+            self.save_dir = save_dir + "/val/"
 
-        self.save_dir = save_dir
         self.Area_save_dir = os.path.join(self.save_dir , "Area_Mask")
         self.Lane_save_dir = os.path.join(self.save_dir , "Lane_Masks")
 
@@ -103,30 +105,35 @@ def main():
     print(intro)
 
     # Usage
-    data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/train/"
-    label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_train.json'
-    save_path = '/home/kia/BDD100K/Generated/'
 
-    class_mapping = {
-        'traffic_light': 0,
-        'traffic_sign': 1,
-        'car': 2
-    }
+    P = Parameters()
+    train_data_path = P.train_data_path
+    train_label_path = P.train_label_path
+    val_data_path = P.val_data_path
+    val_label_path = P.val_label_path
+    save_path = P.save_path
+    class_mapping = P.class_mapping
+    epochs = P.epoch_number
 
-    dataset = LabelGenerator(data_path, label_path, save_path ,image_size=(640, 640), normalize=True, class_mapping=class_mapping)
+    train_dataset = LabelGenerator(train_data_path, train_label_path, save_path ,image_size=(640, 640), normalize=True, class_mapping=class_mapping,train=True)
+    val_dataset = LabelGenerator(val_data_path, val_label_path, save_path ,image_size=(640, 640), normalize=True, class_mapping=class_mapping,train=False)
+
     batch_size = 1
-    train_data_loader = DataLoaderX(dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
-    # Create subfolders if they don't exist
-    save_dir = save_path
-    image_save_dir = os.path.join(save_dir, "Area_Mask")
-    mask_save_dir = os.path.join(save_dir, "Lane_Masks")
 
-    os.makedirs(image_save_dir, exist_ok=True)
-    os.makedirs(mask_save_dir, exist_ok=True)
+    train_data_loader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
+    val_data_loader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
+
 
     for i, (run) in enumerate(tqdm(train_data_loader)):
         
         continue
+    pritn("Generating Train Mask Label Done")
+
+    for i, (run) in enumerate(tqdm(val_data_loader)):
+        
+        continue
+
+    pritn("Generating Validation Mask Label Done")
 
 if __name__ == "__main__":
 

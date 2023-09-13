@@ -17,7 +17,7 @@ class Parameters():
     val_data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/"
     val_label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_val.json'
     save_path = '/home/kia/BDD100K/Generated/'
-    train_Lane_Mask_path = "/home/kia/BDD100K/Generated/trian/Lane_Masks"
+    train_Lane_Mask_path = "/home/kia/BDD100K/Generated/train/Lane_Masks"
     train_Area_Mask_path = "/home/kia/BDD100K/Generated/train/Area_Mask"
     val_Lane_Mask_path = "/home/kia/BDD100K/Generated/val/Lane_Masks"
     val_Area_Mask_path = "/home/kia/BDD100K/Generated/val/Area_Mask"

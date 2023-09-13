@@ -77,9 +77,9 @@ class LabelGenerator(Dataset):
 
         drivable_clustered , drivable_cluster_index ,lane_clustered , lane_cluster_index , obj_annot = self.data_loader.create_masks(annotation,CreateMasks=True)
 
-        cv2.imwrite(os.path.join(self.Area_save_dir,image_name),drivable_clustered*(255//drivable_cluster_index))
+        cv2.imwrite(os.path.join(self.Area_save_dir,image_name),(drivable_clustered*(255/(drivable_cluster_index))).astype(np.uint8),[cv2.IMWRITE_JPEG_QUALITY, 100])
 
-        cv2.imwrite(os.path.join(self.Lane_save_dir,image_name),lane_clustered*(255//lane_cluster_index))
+        cv2.imwrite(os.path.join(self.Lane_save_dir,image_name),lane_clustered*(255//lane_cluster_index),[cv2.IMWRITE_JPEG_QUALITY, 100])
 
         return []
 

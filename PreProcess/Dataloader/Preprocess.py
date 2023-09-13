@@ -73,8 +73,8 @@ class CustomDataLoader:
         lane_clustered_mask = cv2.cvtColor(lane_clustered_mask, cv2.COLOR_BGR2GRAY)
         drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
 
-        lane_clustered_mask = (lane_clustered_mask//255).astype(np.uint8)
-        drivable_clustered_mask = (drivable_clustered_mask // 255).astype(np.uint8)
+        lane_clustered_mask = self.clusterize(lane_clustered_mask)
+        drivable_clustered_mask = self.clusterize(drivable_clustered_mask)
 
         object_annotations = []
         # Resize and normalize the image
@@ -98,7 +98,6 @@ class CustomDataLoader:
         # Return processed image, cluster masks, and instance masks
 
         return image  , cluster_mask , instance_drivable , object_annotations 
-
 
     def create_masks(self, annotation , CreateMasks = True ) :
         lane_clustered = np.zeros((720, 1280))
@@ -161,26 +160,23 @@ class CustomDataLoader:
             640, box[2]/640, box[3]/640
         return xc, yc, wb, hb
 
-    def calculate_iou(self,mask1, mask2):
-        """
-        Calculate Intersection over Union (IoU) between two binary masks.
+    def local_picks(self,array):
+        last = 0
+        picks = []
+        for i,s in enumerate(array):
+            if s - last > 15:
+                picks.append(i)
+            last = s
+        return picks
 
-        Parameters:
-        - mask1: NumPy array representing the first binary mask (0 or 1).
-        - mask2: NumPy array representing the second binary mask (0 or 1).
-
-        Returns:
-        - iou: IoU score between the two masks, a value between 0 and 1.
-        """
-        intersection = np.logical_and(mask1, mask2).sum()
-        union = np.logical_or(mask1, mask2).sum()
-
-        if union == 0:
-            iou = 0.0
+    def clusterize(self,k):
+        uniques = np.unique(k)
+        picks = self.local_picks(uniques)
+        if len(picks)>1:
+            k = (np.ceil(np.unique(((k))/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8))
         else:
-            iou = intersection / union
-
-        return iou
+            k = (np.ceil(np.unique(((k))/(uniques[picks[0]]))).astype(np.uint8))
+        return k
     def max_pooling_2d(self , input_array, pool_size=(2, 2)):
 
         input_height, input_width = input_array.shape
@@ -229,3 +225,6 @@ class CustomDataLoader:
 
     def normalize_image(self, image):
         return image.astype(np.float32) / 255.0
+
+
+

@@ -321,22 +321,46 @@ def cluster_to_embedding_feature(cluster_mask, size):
 
     return ground
 
+def max_pooling_2d(input_array, pool_size=(2, 2)):
 
-# Example usage
-size = 4
-# cluster_mask = np.array([[1, 1, 2, 0],
-#                          [1, 1, 0, 3],
-#                          [4, 0, 0, 3],
-#                          [4, 5, 5, 0]])
-cluster_mask = np.array(([16,8,7,4],
-                        [1,4,7,8],
-                        [1,16,11,12],
-                        [13,14,16,16]))
+        input_height, input_width = input_array.shape
+        output_height = input_height // pool_size[0]
+        output_width = input_width // pool_size[1]
 
-result = cluster_to_embedding_feature(cluster_mask, size)
-print(result)
-# res = cluster_to_embedding_feature(cluster_mask,4)
-# print(res)
-res = result.to('cpu').numpy()
-plt.imshow(res[0])
-plt.show()
+        # Calculate padding size
+        padding_height = pool_size[0] - 1
+        padding_width = pool_size[1] - 1
+
+        # Pad input_array with zeros
+        padded_array = np.zeros((input_height + padding_height, input_width + padding_width))
+        padded_array[:input_height, :input_width] = input_array
+
+        # Reshape padded_array to be divided into pool_size blocks
+        reshaped_array = padded_array[:output_height*pool_size[0], :output_width*pool_size[1]].reshape(
+            output_height, pool_size[0], output_width, pool_size[1]
+        )
+
+        # Apply max pooling using numpy's max function along specified axes
+        pooled_array = reshaped_array.max(axis=(1, 3))
+
+        # Crop pooled_array to remove the padding
+        pooled_array = pooled_array[:output_height, :output_width]
+
+        return pooled_array
+
+def local_picks(self,array):
+    last = 0
+    picks = []
+    for i,s in enumerate(array):
+        if s - last > 15:
+            picks.append(i)
+        last = s
+    return picks
+
+def clusterize(self,k):
+    uniques = np.unique(k)
+    picks = self.local_picks(uniques)
+    if len(picks)>1:
+        k = (np.ceil(np.unique(((k))/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8))
+    else:
+        k = (np.ceil(np.unique(((k))/(uniques[picks[0]]))).astype(np.uint8))

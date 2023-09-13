@@ -6,7 +6,7 @@ from  torch import nn
 from  tqdm import  tqdm
 import torch.nn.functional as F
 import argparse
-
+import torch.multiprocessing as mp
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -125,6 +125,7 @@ def train(args):
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn')
     print('''
       _______        _       
      |__   __|      (_)      

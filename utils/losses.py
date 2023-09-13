@@ -160,7 +160,7 @@ class ComputeLoss(nn.Module) :
 
         GroundTruth_Confidence , GroundTruth_EmbeddingFeatureArea = targets
 
-
+        GroundTruth_Confidence = GroundTruth_Confidence.to(torch.float32)
 
         SegLoss = self.Segmentation_Confidence_Loss(Pred_Confidence,GroundTruth_Confidence)
 

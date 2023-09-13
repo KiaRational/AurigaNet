@@ -88,7 +88,6 @@ class CustomDataLoader:
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
         drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask))
-        lane_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(lane_clustered_mask))
 
         # Convert cluster masks to instance masks using embedding feature
         instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=80) 
@@ -174,9 +173,16 @@ class CustomDataLoader:
         picks = self.local_picks(uniques)
         if len(picks)>1:
             k = (np.ceil(np.unique(((k))/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8))
+
+        elif len(picks)==1:
+            
+            k[k>0]=1
+
         else:
-            k = (np.ceil(np.unique(((k))/(uniques[picks[0]]))).astype(np.uint8))
+            k = np.zeros_like(k)
+
         return k
+
     def max_pooling_2d(self , input_array, pool_size=(2, 2)):
 
         input_height, input_width = input_array.shape

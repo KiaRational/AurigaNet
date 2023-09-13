@@ -29,6 +29,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     for i, (images, confidence_mask, instance_drivable , objects_annotations ) in enumerate(tqdm(dataloader)):
         # Zero the gradients
         targets = [confidence_mask.to(device),instance_drivable.to(device)]
+
         inputs = images.to(device)
         optimizer.zero_grad()
 

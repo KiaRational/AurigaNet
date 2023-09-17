@@ -7,7 +7,7 @@ from  tqdm import  tqdm
 import torch.nn.functional as F
 import argparse
 import torch.multiprocessing as mp
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -115,12 +115,15 @@ def train(args,P):
             f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
             f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
         )
-        writer.add_scalar('training loss ',train_loss , epoch+1)
-        writer.add_scalar('train drivable mIoU acc ',train_drivable_iou_acc ,  epoch+1)
-        writer.add_scalar('train drivable f1 acc',train_drivable_f1_acc ,  epoch+1)
-        writer.add_scalar('train lane f1 acc',train_lane_f1_acc ,  epoch+1)
-        writer.add_scalar('train lane mIoU acc ',train_lane_iou_acc ,  epoch+1)
+        
+        ## TensorBoard Summaries
+        # writer.add_scalar('training loss ',train_loss , epoch+1)
+        # writer.add_scalar('train drivable mIoU acc ',train_drivable_iou_acc ,  epoch+1)
+        # writer.add_scalar('train drivable f1 acc',train_drivable_f1_acc ,  epoch+1)
+        # writer.add_scalar('train lane f1 acc',train_lane_f1_acc ,  epoch+1)
+        # writer.add_scalar('train lane mIoU acc ',train_lane_iou_acc ,  epoch+1)
         # Update results dictionary
+
         results["train_loss"].append(train_loss)
         results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
         results["train_lane_iou_acc"].append(train_lane_iou_acc)
@@ -150,7 +153,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Your description here.")
     # parser.add_argument("--data_path", type=str, help="Path to data.")
     # parser.add_argument("--label_path", type=str, help="Path to labels.")
-    # parser.add_argument("--save_path", type=str, help="Path to save results.")
+    parser.add_argument("--save_path", type=str, default="" ,help="Path to save results.")
     parser.add_argument("--device",type=str ,default="cuda", help="choose your training device cuda or cpu")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of workers for dataloader.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size.")
@@ -158,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("--version", action="store_true",default="1", help="version of your training")
     args = parser.parse_args()
     P = Parameters()
-    writer = SummaryWriter(os.path.join(P.save_path,"/runs/1/"))
-    results , model = train(args,P,writer)
-    
+    # writer_path =  os.path.join(args.save_path,"/runs/1/")
+    os.makedirs(writer_path, exist_ok=True)
+    # writer = SummaryWriter(writer_path)
+    results , model = train(args,P)

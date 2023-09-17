@@ -71,6 +71,9 @@ def train(args,P):
     batch_size = args.batch_size
     shuffle = args.shuffle
     device = args.device
+    save_path =  os.path.join(args.save_path,"/saved/")
+    os.makedirs(save_path, exist_ok=True)
+
     # Create a dictionary to store results
     results = {"train_loss": [],
         "train_lane_f1_acc": [],
@@ -124,12 +127,18 @@ def train(args,P):
         # writer.add_scalar('train lane mIoU acc ',train_lane_iou_acc ,  epoch+1)
         # Update results dictionary
 
+
         results["train_loss"].append(train_loss)
         results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
         results["train_lane_iou_acc"].append(train_lane_iou_acc)
         results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
         results["train_lane_f1_acc"].append(train_lane_f1_acc)
 
+        torch.save(
+            model.state_dict(),
+            save_path+str(epoch)+'_'+str(loss)+'_'+'AurigaNet.pkl'
+        )
+        
     print("Training complete")
     writer.close()
     return results , model
@@ -162,6 +171,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     P = Parameters()
     # writer_path =  os.path.join(args.save_path,"/runs/1/")
-    os.makedirs(writer_path, exist_ok=True)
+    # os.makedirs(writer_path, exist_ok=True)
     # writer = SummaryWriter(writer_path)
     results , model = train(args,P)

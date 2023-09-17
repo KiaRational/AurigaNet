@@ -57,6 +57,7 @@ class CustomDataLoader:
         # Get image name and path from the annotation
         image_name = annotation['name']
         image_path = os.path.join(self.data_path, image_name)
+        
         if self.train:
             lane_mask_path = os.path.join(self.p.train_Lane_Mask_path,image_name)
             area_mask_path = os.path.join(self.p.train_Area_Mask_path,image_name)

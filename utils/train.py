@@ -7,6 +7,8 @@ from  tqdm import  tqdm
 import torch.nn.functional as F
 import argparse
 import torch.multiprocessing as mp
+from torch.utils.tensorboard import SummaryWriter
+
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -56,9 +58,8 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     return (total_loss / len(dataloader)) , (total_iou_drivable / len(dataloader)) ,(total_iou_lane / len(dataloader)) ,(total_f1_drivable / len(dataloader)) ,(total_f1_lane / len(dataloader)) 
 
 
-def train(args):
+def train(args,P):
     # Initialize Parameters and set up paths and settings
-    P = Parameters()
     train_data_path = P.train_data_path
     train_label_path = P.train_label_path
     val_data_path = P.val_data_path
@@ -114,14 +115,20 @@ def train(args):
             f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
             f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
         )
-
+        writer.add_scalar('training loss ',train_loss , epoch+1)
+        writer.add_scalar('train drivable mIoU acc ',train_drivable_iou_acc ,  epoch+1)
+        writer.add_scalar('train drivable f1 acc',train_drivable_f1_acc ,  epoch+1)
+        writer.add_scalar('train lane f1 acc',train_lane_f1_acc ,  epoch+1)
+        writer.add_scalar('train lane mIoU acc ',train_lane_iou_acc ,  epoch+1)
         # Update results dictionary
         results["train_loss"].append(train_loss)
         results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
         results["train_lane_iou_acc"].append(train_lane_iou_acc)
         results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
         results["train_lane_f1_acc"].append(train_lane_f1_acc)
+
     print("Training complete")
+    writer.close()
     return results , model
 
 
@@ -148,5 +155,9 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=1, help="Number of workers for dataloader.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size.")
     parser.add_argument("--shuffle", action="store_true",default=False, help="Shuffle the data.")
+    parser.add_argument("--version", action="store_true",default="1", help="version of your training")
     args = parser.parse_args()
-    results , model = train(args)
+    P = Parameters()
+    writer = SummaryWriter(os.path.join(P.save_path,"/runs/1/"))
+    results , model = train(args,P,writer)
+    

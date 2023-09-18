@@ -1,6 +1,6 @@
 import torch 
 from torch import nn
-from BackBone import BottleNeck
+from .BackBone import BottleNeck
 
 
 class CBL(nn.Sequential):

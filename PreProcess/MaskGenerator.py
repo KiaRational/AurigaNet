@@ -15,9 +15,9 @@ import shutil
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from PreProcess.Dataloader.Preprocess import CustomDataLoader
+from Dataloader.Preprocess import CustomDataLoader
 
-from utils.Parameters import Parameters
+from utils.seg.Parameters import Parameters
 
 
 class LabelGenerator(Dataset):

@@ -1,0 +1,9 @@
+# fix batch size problem for object annotations in data loader *** => NOTE: in order to fix this we should move     ground truth generation to dataloader section
+# complete custom validation => AP, mAP50, mAP95, confusion matrix (tp, fp, tn, fn), f1 score, plot the accuracy 
+# write utils function from scratch
+# organize object codes
+# manage model hyperparameters
+# change compute loss and ground truth maker and if it is necessary move it to data loading process
+
+
+# add a requirement checker and installer

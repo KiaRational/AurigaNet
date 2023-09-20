@@ -7,8 +7,6 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 from Models.BackBone import BackBone
-from Models.SegNeck import SegNeck
-from Models.ObjNeck import Object
 from Models.Neck import Neck
 from Models.SegHead import SegHead
 from Models.ObjHead import Object
@@ -34,12 +32,12 @@ class MultiNet(nn.Module):
         super(MultiNet, self).__init__()
 
         out_channels_list = [64,128,256,512]
-        w = 4
-        r = 2
-        d = 3
+        w = 4 #width coefficient
+        r = 2 #ratio
+        d = 3 #depth
 
         self.BackBone = BackBone(in_channels=3, out_channels_list=out_channels_list , w=w , r=r , d=d)
-        self.Neck = Neck(out_channels_list,w,r,d)
+        self.Neck = Neck(out_channels_list,w=w,r=r,d=d)
         self.Seg = SegHead(out_channels_list,w=w,r=r,d=d,class_number=2)
 
         # self.Seg = SegNeck(out_channels_list , class_number = 2)
@@ -51,7 +49,7 @@ class MultiNet(nn.Module):
 
         # # self.Seg = SegNeck()
 
-        self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
+        # self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
 
     def forward(self, x):
         """
@@ -67,7 +65,7 @@ class MultiNet(nn.Module):
         Octant_out , One_sixteenth_out , One_thirty_second_out = self.Neck(Octant,One_sixteenth)
         Out = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
 
-        Out = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
+        # Out = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
         # Out = [Half, Quarter, Octant, One_sixteenth]
         return Out
 

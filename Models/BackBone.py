@@ -75,17 +75,25 @@ class BackBone(nn.Module):
         stride (int, optional): Stride used for the convolution operations. Default is 1.
         resize_module (bool, optional): Whether the module is used for resizing. Default is False.
     """
-    def __init__(self, in_channels, out_channels_list, kernel_size=3, padding=1, stride=1 ,  resize_module=False):
+    def __init__(self, in_channels, out_channels_list, w=4 , r=2 , d=3 ,kernel_size=3, padding=1, stride=1 ,  resize_module=False):
         super(BackBone, self).__init__()
-        self.layer1 = ConvBNSiLU(in_channels=in_channels, n_filters=out_channels_list[0], k_size=7, padding=3, stride=1)
-        self.bottleneck1 = BottleNeck(in_channels=out_channels_list[0], out_channels=out_channels_list[0],
+        self.layer1 = ConvBNSiLU(in_channels=in_channels, n_filters=out_channels_list[0]*r//w, k_size=7, padding=3, stride=1)
+        self.bottleneck1 = BottleNeck(in_channels=out_channels_list[0]*r//w, out_channels=out_channels_list[0]*r//w,
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck2 = BottleNeck(in_channels=out_channels_list[0], out_channels=out_channels_list[1],
+        self.bottleneck2 = BottleNeck(in_channels=out_channels_list[0]*r//w, out_channels=out_channels_list[1]*r//w,
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck3 = BottleNeck(in_channels=out_channels_list[1], out_channels=out_channels_list[2],
+        self.bottleneck3 = BottleNeck(in_channels=out_channels_list[1]*r//w, out_channels=out_channels_list[2]*r//w,
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
-        self.bottleneck4 = BottleNeck(in_channels=out_channels_list[2], out_channels=out_channels_list[3],
+        self.bottleneck4 = BottleNeck(in_channels=out_channels_list[2]*r//w, out_channels=out_channels_list[3]*r//w,
                                       kernel_size=3, padding=1, stride=1, resize_module=True)
+        self.bottleneck1_out = BottleNeck(in_channels=out_channels_list[0]*r//w, out_channels=out_channels_list[0]//w,
+                                      kernel_size=3, padding=1, stride=1, resize_module=False)
+        self.bottleneck2_out = BottleNeck(in_channels=out_channels_list[1]*r//w, out_channels=out_channels_list[1]//w,
+                                      kernel_size=3, padding=1, stride=1, resize_module=False)
+        self.bottleneck3_out = BottleNeck(in_channels=out_channels_list[2]*r//w, out_channels=out_channels_list[2]//w,
+                                      kernel_size=3, padding=1, stride=1, resize_module=False)
+        self.bottleneck4_out = BottleNeck(in_channels=out_channels_list[3]*r//w, out_channels=out_channels_list[3]//w,
+                                      kernel_size=3, padding=1, stride=1, resize_module=False)
 
     def forward(self, x):
         """
@@ -102,5 +110,10 @@ class BackBone(nn.Module):
         Quarter = self.bottleneck2(Half)
         Octant = self.bottleneck3(Quarter)
         One_sixteenth = self.bottleneck4(Octant)
+
+        Half = self.bottleneck1_out(Half)
+        Quarter = self.bottleneck2_out(Quarter)
+        Octant = self.bottleneck3_out(Octant)
+        One_sixteenth = self.bottleneck4_out(One_sixteenth)
 
         return Half, Quarter, Octant, One_sixteenth

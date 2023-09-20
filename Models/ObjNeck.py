@@ -3,6 +3,13 @@ from torch import nn
 from .BackBone import BottleNeck
 
 
+import os 
+import sys
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(project_root)
+
+
 class CBL(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias=True):
         super().__init__(
@@ -240,7 +247,6 @@ class YoloHeads(nn.Module):
             x[i] = x[i].view(bs, self.naxs, (5 + self.nc), grid_y,
                              grid_x) # the example tensor shape for grid size 160: [1, 3, 15, 160, 160]
             x[i] = x[i].permute(0, 1, 3, 4, 2).contiguous() # # the example tensor shape for grid size 160: ([1, 3, 160, 160, 15])
-            print(f"\n the shape of a layer {x[i].shape} \n")
 
         return x
 

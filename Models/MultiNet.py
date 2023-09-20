@@ -9,6 +9,9 @@ sys.path.append(project_root)
 from Models.BackBone import BackBone
 from Models.SegNeck import SegNeck
 from Models.ObjNeck import Object
+from Models.Neck import Neck
+from Models.SegHead import SegHead
+from Models.ObjHead import Object
 
 ANCHORS = torch.tensor([
     [[10, 13], [16, 30], [33, 23]],  # P3/8
@@ -27,21 +30,29 @@ class MultiNet(nn.Module):
         BackBone (BackBone): The backbone module.
         Seg (SegNeck): The segmentation neck module.
     """
-    def __init__(self, object_hyp): # TODO object_hyp will be moved to somewhere else in the future
+    def __init__(self): # TODO object_hyp will be moved to somewhere else in the future
         super(MultiNet, self).__init__()
-        out_channels_list = [32,64,128,256]
-        self.BackBone = BackBone(in_channels=3, out_channels_list=out_channels_list)
-        self.Seg = SegNeck(out_channels_list , class_number = 2)
 
-        ###### for object ######
-        self.nl = 3 # number of detection layers
-        self.na = 3
-        self.anchors = ANCHORS
+        out_channels_list = [64,128,256,512]
+        w = 4
+        r = 2
+        d = 3
 
-        # self.Seg = SegNeck()
+        self.BackBone = BackBone(in_channels=3, out_channels_list=out_channels_list , w=w , r=r , d=d)
+        self.Neck = Neck(out_channels_list,w,r,d)
+        self.Seg = SegHead(out_channels_list,w=w,r=r,d=d,class_number=2)
 
-        self.Obj = Object(object_hyp, ANCHORS, out_channels_list=out_channels_list)
-    
+        # self.Seg = SegNeck(out_channels_list , class_number = 2)
+
+        # ###### for object ######
+        # self.nl = 3 # number of detection layers
+        # self.na = 3
+        # self.anchors = ANCHORS
+
+        # # self.Seg = SegNeck()
+
+        self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
+
     def forward(self, x):
         """
         Forward pass of the MultiNet.
@@ -53,14 +64,15 @@ class MultiNet(nn.Module):
             torch.Tensor: Output tensor representing the segmented predictions.
         """
         Half, Quarter, Octant, One_sixteenth  = self.BackBone(x)
-        # Out = self.Seg(Half, Quarter, Octant, One_sixteenth)
+        Octant_out , One_sixteenth_out , One_thirty_second_out = self.Neck(Octant,One_sixteenth)
+        Out = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
 
-        Out = self.Obj([Quarter, Octant, One_sixteenth]) # object predictions
-
+        Out = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
+        # Out = [Half, Quarter, Octant, One_sixteenth]
         return Out
 
 if __name__ == "__main__":
 
-    model = MultiNet({})
+    model = MultiNet()
     # torchinfo.summary(upsample_conv,(1,512, 20, 20))
     torchinfo.summary(model, (1, 3, 640, 640))

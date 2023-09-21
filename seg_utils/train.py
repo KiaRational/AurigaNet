@@ -27,7 +27,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     total_iou_drivable =0
     total_iou_lane = 0
     total_f1_drivable = 0
-
+    total_steps = len(dataloader)
     for i, (images, confidence_mask, instance_drivable , objects_annotations ) in enumerate(tqdm(dataloader)):
         # Zero the gradients
         targets = [confidence_mask.to(device),instance_drivable.to(device)]
@@ -54,7 +54,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
         total_f1_lane += f1_acc_lane
         total_f1_drivable += f1_acc_drivable
         total_loss += loss.item()
-        
+
     return (total_loss / len(dataloader)) , (total_iou_drivable / len(dataloader)) ,(total_iou_lane / len(dataloader)) ,(total_f1_drivable / len(dataloader)) ,(total_f1_lane / len(dataloader)) 
 
 
@@ -100,7 +100,7 @@ def train(args,P):
     loss_fn = Loss.ComputeLoss()
     accuracy_fn = Accuracy()
     # Training loop
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
         model.train()  # Set model in training mode
 
         train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,

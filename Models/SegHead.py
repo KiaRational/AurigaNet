@@ -166,7 +166,7 @@ class SegHead(nn.Module):
         self.BasicBlock2_1 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
         self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
         self.BasicBlock3_2 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w)
-        self.BasicBlock4_3 = BasicBlock(in_channels = out_channels_list[0]//w , out_channels = out_channels_list[0]//w,repeat_num=6)
+        self.BasicBlock4_3 = BasicBlock(in_channels = out_channels_list[0]//w , out_channels = out_channels_list[0]*r//w,repeat_num=5)
         self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
         self.Downsample1_1_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
         self.Downsample1_2_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
@@ -187,7 +187,7 @@ class SegHead(nn.Module):
 
         self.relu = nn.ReLU(inplace=False)
 
-        self.Output_Confidence  = Output(in_channels=240, out_channels= class_number )
+        self.Output_Confidence  = Output(in_channels=256, out_channels= class_number )
 
         self.Output_EmbeddingFeatureArea   = Output(in_channels=256, out_channels = self.p.feature_size)
 

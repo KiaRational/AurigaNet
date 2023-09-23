@@ -38,7 +38,7 @@ class MultiNet(nn.Module):
 
         self.BackBone = BackBone(in_channels=3, out_channels_list=out_channels_list , w=w , r=r , d=d)
         self.Neck = Neck(out_channels_list,w=w,r=r,d=d)
-        self.Seg = SegHead(out_channels_list,w=w,r=r,d=d,class_number=2)
+        # self.Seg = SegHead(out_channels_list,w=w,r=r,d=d,class_number=2)
 
         # self.Seg = SegNeck(out_channels_list , class_number = 2)
 
@@ -49,7 +49,7 @@ class MultiNet(nn.Module):
 
         # # self.Seg = SegNeck()
 
-        # self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
+        # self.Obj = Object(AzNCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
 
     def forward(self, x):
         """
@@ -63,7 +63,7 @@ class MultiNet(nn.Module):
         """
         Half, Quarter, Octant, One_sixteenth  = self.BackBone(x)
         Octant_out , One_sixteenth_out , One_thirty_second_out = self.Neck(Octant,One_sixteenth)
-        Out = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
+        # Out = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
 
         # Out = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
         # Out = [Half, Quarter, Octant, One_sixteenth]

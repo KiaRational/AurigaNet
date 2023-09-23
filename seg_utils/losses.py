@@ -9,7 +9,7 @@ import sys
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from utils.seg.Parameters import Parameters
+from seg_utils.Parameters import Parameters
 
 '''
   _                         __                      _    _                    

@@ -15,9 +15,9 @@ import shutil
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from Dataloader.Preprocess import CustomDataLoader
+from Dataloader import CustomDataLoader
 
-from utils.seg.Parameters import Parameters
+from seg_utils.Parameters import Parameters
 
 
 class LabelGenerator(Dataset):
@@ -77,9 +77,9 @@ class LabelGenerator(Dataset):
 
         drivable_clustered , drivable_cluster_index ,lane_clustered , lane_cluster_index , obj_annot = self.data_loader.create_masks(annotation,CreateMasks=True)
 
-        cv2.imwrite(os.path.join(self.Area_save_dir,image_name),(drivable_clustered*(255/(drivable_cluster_index))).astype(np.uint8),[cv2.IMWRITE_JPEG_QUALITY, 100])
+        cv2.imwrite(os.path.join(self.Area_save_dir,str(image_name[:-4])+".png"),(drivable_clustered*(255/(drivable_cluster_index))).astype(np.uint8))
 
-        cv2.imwrite(os.path.join(self.Lane_save_dir,image_name),lane_clustered*(255//lane_cluster_index),[cv2.IMWRITE_JPEG_QUALITY, 100])
+        # cv2.imwrite(os.path.join(self.Lane_save_dir,str(image_name[:-4])+".png"),lane_clustered*(255//lane_cluster_index))
 
         return []
 

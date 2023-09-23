@@ -12,9 +12,9 @@ from .Preprocess import CustomDataLoader
 
 
 class LabelGenerator(Dataset):
-    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None):
+    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None  , train=True):
 
-        self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping)
+        self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping , train)
 
         self.image_size = image_size
 
@@ -57,7 +57,7 @@ class LabelGenerator(Dataset):
 
         confidence_mask[cluster_mask>0]=1
         
-        return image, confidence_mask , instance_drivable , objects_annotations 
+        return image, confidence_mask , instance_drivable  
 
 
 class DataLoaderX(DataLoader):

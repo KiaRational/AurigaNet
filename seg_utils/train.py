@@ -28,7 +28,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
     total_iou_lane = 0
     total_f1_drivable = 0
     total_steps = len(dataloader)
-    for i, (images, confidence_mask, instance_drivable , objects_annotations ) in enumerate(tqdm(dataloader)):
+    for i, (images, confidence_mask, instance_drivable  ) in enumerate(tqdm(dataloader)):
         # Zero the gradients
         targets = [confidence_mask.to(device),instance_drivable.to(device)]
 
@@ -71,8 +71,8 @@ def train(args,P):
     batch_size = args.batch_size
     shuffle = args.shuffle
     device = args.device
-    save_path =  os.path.join(args.save_path,"/saved/")
-    os.makedirs(save_path, exist_ok=True)
+    save_path =  os.path.join("/home/kia/Multi-Task-Network/Saved")
+    #os.makedirs(save_path, exist_ok=True)
 
     # Create a dictionary to store results
     results = {"train_loss": [],
@@ -99,8 +99,10 @@ def train(args,P):
     optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
     loss_fn = Loss.ComputeLoss()
     accuracy_fn = Accuracy()
-    # Training loop
+    Training loop
     for epoch in range(epochs):
+
+
         model.train()  # Set model in training mode
 
         train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,
@@ -136,11 +138,11 @@ def train(args,P):
 
         torch.save(
             model.state_dict(),
-            save_path+str(epoch)+'_'+str(loss)+'_'+'AurigaNet.pkl'
+            save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pkl'
         )
         
     print("Training complete")
-    writer.close()
+    # writer.close()
     return results , model
 
 
@@ -162,7 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Your description here.")
     # parser.add_argument("--data_path", type=str, help="Path to data.")
     # parser.add_argument("--label_path", type=str, help="Path to labels.")
-    parser.add_argument("--save_path", type=str, default="" ,help="Path to save results.")
+    parser.add_argument("--save_path", type=str, default="/home/kia/Multi-Task-Network/" ,help="Path to save results.")
     parser.add_argument("--device",type=str ,default="cuda", help="choose your training device cuda or cpu")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of workers for dataloader.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size.")

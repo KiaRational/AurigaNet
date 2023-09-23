@@ -88,8 +88,8 @@ class CustomDataLoader:
 
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
-        drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask))
-
+        drivable_clustered_mask_pooled = (self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
+        
         # Convert cluster masks to instance masks using embedding feature
         instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=80) 
 
@@ -109,19 +109,19 @@ class CustomDataLoader:
             
             category = label_info['category']
 
-            if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
+            # if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
                 
-                if CreateMasks:
+            #     if CreateMasks:
 
-                    poly2d = label_info['poly2d']
+            #         poly2d = label_info['poly2d']
 
-                    image_size = ImageSize(width=1280, height=720)
-                    lane_mask = poly2ds_to_mask(image_size, poly2d)
-                    # Identify zero elements in lane_clustered
-                    zero_elements = lane_clustered == 0
+            #         image_size = ImageSize(width=1280, height=720)
+            #         lane_mask = poly2ds_to_mask(image_size, poly2d)
+            #         # Identify zero elements in lane_clustered
+            #         zero_elements = lane_clustered == 0
 
-                    # Add (lane_mask/255)*lane_cluster_index to zero elements
-                    lane_clustered[zero_elements] += (lane_mask[zero_elements]/255) * lane_cluster_index
+            #         # Add (lane_mask/255)*lane_cluster_index to zero elements
+            #         lane_clustered[zero_elements] += (lane_mask[zero_elements]/255) * lane_cluster_index
 
 
             if category == 'drivable area':
@@ -173,7 +173,7 @@ class CustomDataLoader:
         uniques = np.unique(k)
         picks = self.local_picks(uniques)
         if len(picks)>1:
-            k = (np.ceil(np.unique(((k))/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8))
+            k = (np.ceil((k)/max(uniques[picks[0]]+10,uniques[picks[1]-1])+30)).astype(np.uint8)
 
         elif len(picks)==1:
             
@@ -200,7 +200,26 @@ class CustomDataLoader:
 
         return pooled_array
 
+    # def cluster_to_embedding_feature(self,cluster_mask, size):
 
+    #     dimensions = size ** 2
+
+    #     cluster_mask = cluster_mask.flatten()
+    #     ground = np.zeros((1, dimensions, dimensions), dtype=np.int32)
+
+    #     # Create a 2D mask for the same instance condition
+    #     same_instance_mask = (cluster_mask[:, None] == cluster_mask)
+
+    #     # Create a 2D mask for different instance, same class condition
+    #     diff_instance_same_class_mask = ~same_instance_mask & (cluster_mask[:, None] != 0)
+
+    #     # Assign values based on conditions
+    #     ground[0][same_instance_mask] = 1  # same instance
+    #     ground[0][diff_instance_same_class_mask] = 2  # different instance, same class
+    #     ground[0][cluster_mask == 0] = 3  # different instance, different class
+
+    #     return ground
+        
     def cluster_to_embedding_feature(self,cluster_mask, size):
         
         dimensions = size ** 2

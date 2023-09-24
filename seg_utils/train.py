@@ -140,6 +140,7 @@ def train(args,P):
             model.state_dict(),
             save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pkl'
         )
+
         
     print("Training complete")
     # writer.close()

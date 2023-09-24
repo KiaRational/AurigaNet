@@ -59,11 +59,11 @@ class CustomDataLoader:
         image_path = os.path.join(self.data_path, image_name)
         
         if self.train:
-            lane_mask_path = os.path.join(self.p.train_Lane_Mask_path,image_name)
-            area_mask_path = os.path.join(self.p.train_Area_Mask_path,image_name)
+            lane_mask_path = os.path.join(self.p.train_Lane_Mask_path,str(image_name[:-4])+".png")
+            area_mask_path = os.path.join(self.p.train_Area_Mask_path,str(image_name[:-4])+".png")
         else:
-            lane_mask_path = os.path.join(self.p.val_Lane_Mask_path,image_name)
-            area_mask_path = os.path.join(self.p.val_Area_Mask_path,image_name)
+            lane_mask_path = os.path.join(self.p.val_Lane_Mask_path,str(image_name[:-4])+".png")
+            area_mask_path = os.path.join(self.p.val_Area_Mask_path,str(image_name[:-4])+".png")
             
         # Read and convert the image to RGB format
         image = cv2.imread(image_path)
@@ -88,10 +88,12 @@ class CustomDataLoader:
 
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
-        drivable_clustered_mask_pooled = (self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
-        
+        drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
+        plt.imshow(drivable_clustered_mask_pooled)
+        plt.savefig("/home/kia/Multi-Task-Network/Dataloader/new.png")
+
         # Convert cluster masks to instance masks using embedding feature
-        instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=80) 
+        instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 
 
         object_annotations = self.create_masks(annotation,False)
 
@@ -109,19 +111,19 @@ class CustomDataLoader:
             
             category = label_info['category']
 
-            # if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
+            if category == 'lane':# and label_info['attributes']['laneDirection'] == 'parallel':
                 
-            #     if CreateMasks:
+                if CreateMasks:
 
-            #         poly2d = label_info['poly2d']
+                    poly2d = label_info['poly2d']
 
-            #         image_size = ImageSize(width=1280, height=720)
-            #         lane_mask = poly2ds_to_mask(image_size, poly2d)
-            #         # Identify zero elements in lane_clustered
-            #         zero_elements = lane_clustered == 0
+                    image_size = ImageSize(width=1280, height=720)
+                    lane_mask = poly2ds_to_mask(image_size, poly2d)
+                    # Identify zero elements in lane_clustered
+                    zero_elements = lane_clustered == 0
 
-            #         # Add (lane_mask/255)*lane_cluster_index to zero elements
-            #         lane_clustered[zero_elements] += (lane_mask[zero_elements]/255) * lane_cluster_index
+                    # Add (lane_mask/255)*lane_cluster_index to zero elements
+                    lane_clustered[zero_elements] += (lane_mask[zero_elements]/255) * lane_cluster_index
 
 
             if category == 'drivable area':

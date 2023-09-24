@@ -168,12 +168,13 @@ class SegHead(nn.Module):
         self.BasicBlock3_2 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w)
         self.BasicBlock4_3 = BasicBlock(in_channels = out_channels_list[0]//w , out_channels = out_channels_list[0]*r//w,repeat_num=5)
         self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//(w*r))
         self.Downsample1_1_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
         self.Downsample1_2_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
         self.Downsample1_2_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[3]//w , downsample_ratio=4)
         self.Downsample2_2_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
-        self.Downsample1_3_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
-
+        self.Downsample1_3_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=4)
+        self.Downsample2_3_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
         self.Upsample2_1_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
         self.Upsample2_2_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
         self.Upsample3_2_4 = BilinearUpsampleConv1x1(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[1]//w , upsample_ratio=4)
@@ -183,7 +184,6 @@ class SegHead(nn.Module):
         self.mixUpsample2_3_4= MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w , upsample_ratio=4)
         self.mixUpsample3_3_8 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=8)
 
-        self.secondmixUpsample3_3_2 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=2)
 
         self.relu = nn.ReLU(inplace=False)
 
@@ -227,17 +227,18 @@ class SegHead(nn.Module):
 
         Branch4 = self.BasicBlock4_3(Half)
 
-        Branch1_i = self.Downsample1_3_2(Branch1)
+        Branch1_i = self.Downsample1_3_4(Branch1)
 
-        Branch2_I = self.BasicBlock2_3(Branch2)
+        Branch2_I = self.Downsample2_3_2(Branch2)
 
-        Branch3_I = self.secondmixUpsample3_3_2(Branch3)
+        Branch3_I = self.BasicBlock3_3(Branch3)
 
         Branch1 = self.mixUpsample1_3_2(Branch1)
 
         Branch2 = self.mixUpsample2_3_4(Branch2)
 
         Branch3 = self.mixUpsample3_3_8(Branch3)
+
 
         Out_Confidence = torch.cat((Branch1,Branch2,Branch3 ,Branch4),dim=1)
         

@@ -79,7 +79,7 @@ class LabelGenerator(Dataset):
 
         cv2.imwrite(os.path.join(self.Area_save_dir,str(image_name[:-4])+".png"),(drivable_clustered*(255/(drivable_cluster_index))).astype(np.uint8))
 
-        # cv2.imwrite(os.path.join(self.Lane_save_dir,str(image_name[:-4])+".png"),lane_clustered*(255//lane_cluster_index))
+        cv2.imwrite(os.path.join(self.Lane_save_dir,str(image_name[:-4])+".png"),lane_clustered*(255//lane_cluster_index))
 
         return []
 

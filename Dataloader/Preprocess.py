@@ -89,8 +89,6 @@ class CustomDataLoader:
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
         drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
-        plt.imshow(drivable_clustered_mask_pooled)
-        plt.savefig("/home/kia/Multi-Task-Network/Dataloader/new.png")
 
         # Convert cluster masks to instance masks using embedding feature
         instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 

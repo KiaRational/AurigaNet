@@ -72,6 +72,7 @@ def train(args,P):
     shuffle = args.shuffle
     device = args.device
     save_path =  os.path.join("/home/kia/Multi-Task-Network/Saved")
+    pre_trained = args.pre_trained
     #os.makedirs(save_path, exist_ok=True)
 
     # Create a dictionary to store results
@@ -95,11 +96,16 @@ def train(args,P):
     # Initialize model
     model = MultiNet().to(device)
 
+    if pre_trained != "":
+
+        model.load_state_dict(torch.load(pre_trained, map_location="cuda")) 
+
     # Initialize optimizer and loss function
     optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
     loss_fn = Loss.ComputeLoss()
     accuracy_fn = Accuracy()
-    Training loop
+
+    # Training loop
     for epoch in range(epochs):
 
 
@@ -165,6 +171,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Your description here.")
     # parser.add_argument("--data_path", type=str, help="Path to data.")
     # parser.add_argument("--label_path", type=str, help="Path to labels.")
+    parser.add_argument("--pre_trained", type=str, default= "",help="Path to pre trained model.")
     parser.add_argument("--save_path", type=str, default="/home/kia/Multi-Task-Network/" ,help="Path to save results.")
     parser.add_argument("--device",type=str ,default="cuda", help="choose your training device cuda or cpu")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of workers for dataloader.")

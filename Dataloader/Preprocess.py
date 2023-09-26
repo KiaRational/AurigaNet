@@ -1,5 +1,7 @@
 import os
 import cv2
+from albumentations.core.transforms_interface import ImageOnlyTransform
+import albumentations as A
 import numpy as np
 import json
 import matplotlib.pyplot as plt
@@ -9,6 +11,7 @@ import torch
 import sys
 
 from .CreatMask import poly2ds_to_mask ,  ImageSize
+from .Augmentation import RandomShadow
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -17,7 +20,7 @@ from seg_utils.Parameters import Parameters
 
 
 class CustomDataLoader:
-    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True):
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=True):
         self.data_path = data_path
         self.p = Parameters()
         self.image_size = image_size
@@ -28,6 +31,22 @@ class CustomDataLoader:
         self.num_samples = len(self.annotations)
         self.device = "cuda"
         self.train = train
+        self.transform = transform
+
+        if self.transform :
+            self.transforms = A.Compose(transforms=[
+                                                RandomShadow(prob=0.50),
+                                                A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, p=0.5),
+                                                A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, p=0.5),
+                                                A.GaussNoise(var_limit=(0, 255), p=0.1),
+                                                A.MotionBlur(blur_limit=17, p=0.1),
+                                                A.CoarseDropout(max_holes=6, max_height=32, max_width=32, p=0.1),
+                                                A.ImageCompression(quality_lower=39, quality_upper=60, p=0.2),
+                                                A.HorizontalFlip(p=0.2),
+                                                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.075, rotate_limit=20, p=0.2,border_mode=cv2.BORDER_CONSTANT)
+                                                ])
+                                            
+
     def load_data(self):
         json_file_path = os.path.join(self.label_path)
         with open(json_file_path, 'r') as f:
@@ -74,13 +93,26 @@ class CustomDataLoader:
         lane_clustered_mask = cv2.cvtColor(lane_clustered_mask, cv2.COLOR_BGR2GRAY)
         drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
 
+        if self.transform:
+
+            masks = [drivable_clustered_mask,lane_clustered_mask]
+
+            augmented = self.transforms(image=image,masks=masks)
+
+            image = augmented['image']
+
+            drivable_clustered_mask = augmented['masks'][0]
+
+            lane_clustered_mask = augmented['masks'][1]
+
         lane_clustered_mask = self.clusterize(lane_clustered_mask)
         drivable_clustered_mask = self.clusterize(drivable_clustered_mask)
+
 
         object_annotations = []
         # Resize and normalize the image
         image = self.resize_image(image)
-        image = self.normalize_image(image)
+        # image = self.normalize_image(image)
 
         # Resize drivable and lane cluster masks
         lane_clustered_mask = self.resize_mask(lane_clustered_mask)
@@ -89,7 +121,6 @@ class CustomDataLoader:
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
 
         drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
-
         # Convert cluster masks to instance masks using embedding feature
         instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 
 
@@ -97,6 +128,7 @@ class CustomDataLoader:
 
         # Return processed image, cluster masks, and instance masks
 
+        
         return image  , cluster_mask , instance_drivable , object_annotations 
 
     def create_masks(self, annotation , CreateMasks = True ) :

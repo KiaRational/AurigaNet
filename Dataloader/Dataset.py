@@ -12,7 +12,7 @@ from .Preprocess import CustomDataLoader
 
 
 class LabelGenerator(Dataset):
-    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None  , train=True):
+    def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None  , train=True ):
 
         self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping , train)
 
@@ -21,7 +21,6 @@ class LabelGenerator(Dataset):
         self.save_dir = save_dir
 
         self.check_disk_space(self.save_dir , self.data_loader.num_samples )
-
 
     def calculate_disk_space(self, num_samples):
         # Size calculation for image, cluster_mask, and instance_mask
@@ -51,12 +50,14 @@ class LabelGenerator(Dataset):
 
         image  , cluster_mask , instance_drivable  , objects_annotations = self.data_loader.process(annotation)
 
-        image = image.transpose((2, 0, 1))
-
         confidence_mask = np.zeros_like(cluster_mask)
 
         confidence_mask[cluster_mask>0]=1
         
+        image.astype(np.float32) / 255.0
+
+        image = image.transpose((2, 0, 1))
+
         return image, confidence_mask , instance_drivable  
 
 

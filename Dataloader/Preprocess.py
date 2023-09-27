@@ -112,7 +112,7 @@ class CustomDataLoader:
         object_annotations = []
         # Resize and normalize the image
         image = self.resize_image(image)
-        # image = self.normalize_image(image)
+        image = self.normalize_image(image)
 
         # Resize drivable and lane cluster masks
         lane_clustered_mask = self.resize_mask(lane_clustered_mask)

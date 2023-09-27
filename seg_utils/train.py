@@ -33,7 +33,6 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
         targets = [confidence_mask.to(device),instance_drivable.to(device)]
 
         inputs = images.to(device)
-        optimizer.zero_grad()
 
         # Forward pass
         outputs = model(inputs)
@@ -47,6 +46,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
 
 
         # Backpropagation
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         total_iou_lane += iou_acc_lane

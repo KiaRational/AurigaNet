@@ -54,8 +54,6 @@ class LabelGenerator(Dataset):
 
         confidence_mask[cluster_mask>0]=1
         
-        image.astype(np.float32) / 255.0
-
         image = image.transpose((2, 0, 1))
 
         return image, confidence_mask , instance_drivable  

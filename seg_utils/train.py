@@ -21,42 +21,65 @@ import seg_utils.losses as Loss
 from   seg_utils.accuracy import Accuracy
 
 
-def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,device):
+def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,grad_scaler,device):
     total_loss = 0
     total_f1_lane = 0
     total_iou_drivable =0
     total_iou_lane = 0
     total_f1_drivable = 0
     total_steps = len(dataloader)
+
     for i, (images, confidence_mask, instance_drivable  ) in enumerate(tqdm(dataloader)):
         # Zero the gradients
         targets = [confidence_mask.to(device),instance_drivable.to(device)]
+        with torch.autocast(device):
 
-        inputs = images.to(device)
+            inputs = images.to(device)
+            # Forward pass
+            outputs = model(inputs)
 
-        # Forward pass
-        outputs = model(inputs)
-
-        # Calculate loss
-        loss = loss_fn(outputs, targets)
-        iou_acc_drivable = accuracy_fn.calculate_iou(targets[0][:,0,:,:],outputs[0][:,0,:,:])
-        iou_acc_lane = accuracy_fn.calculate_iou(targets[0][:,1,:,:],outputs[0][:,1,:,:])
-        f1_acc_drivable = accuracy_fn.calculate_f1_score(targets[0][:,0,:,:],outputs[0][:,0,:,:])
-        f1_acc_lane = accuracy_fn.calculate_f1_score(targets[0][:,1,:,:],outputs[0][:,1,:,:])
-
+            # Calculate loss
+            loss = loss_fn(outputs, targets)
 
         # Backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        total_iou_lane += iou_acc_lane
-        total_iou_drivable += iou_acc_drivable
-        total_f1_lane += f1_acc_lane
-        total_f1_drivable += f1_acc_drivable
+
+        optimizer.zero_grad(set_to_none=True)
+        grad_scaler.scale(loss).backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        grad_scaler.step(optimizer)
+        grad_scaler.update()
         total_loss += loss.item()
 
-    return (total_loss / len(dataloader)) , (total_iou_drivable / len(dataloader)) ,(total_iou_lane / len(dataloader)) ,(total_f1_drivable / len(dataloader)) ,(total_f1_lane / len(dataloader)) 
 
+    return model , (total_loss / len(dataloader))
+
+
+@torch.inference_mode()
+def evaluate(net, dataloader, device):
+    net.eval()
+    num_val_batches = len(dataloader)
+    dice_score = 0
+    dice_score_lane = 0
+    dice_score_area = 0
+    # iterate over the validation set
+    with torch.autocast(device):
+        for i, (images, confidence_mask, instance_drivable  ) in enumerate(tqdm(dataloader)):
+            
+            # move images and labels to correct device and type
+            image = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
+            confidence_mask = confidence_mask.to(device=device, dtype=torch.long)
+
+            # predict the mask
+            predictions = net(image)
+            Pred_Confidence , Pred_EmbeddingFeatureArea = predictions
+            Pred_Confidence_Drivable = Pred_Confidence[:,0,:,:]
+            Pred_Confidence_Lane = Pred_Confidence[:,1,:,:]
+            dice_score_lane += Loss.dice_coeff(F.sigmoid(Pred_Confidence_Lane),confidence_mask[:,1,:,:],reduce_batch_first=True)
+            dice_score_area += Loss.dice_coeff(F.sigmoid(Pred_Confidence_Drivable),confidence_mask[:,0,:,:],reduce_batch_first=True)
+            dice_score += Loss.multiclass_dice_coeff(F.sigmoid(Pred_Confidence), confidence_mask, reduce_batch_first=True)
+
+    net.train()
+    return dice_score / max(num_val_batches, 1) , dice_score_area / max(num_val_batches, 1) , dice_score_lane / max(num_val_batches, 1)
 
 def train(args,P):
     # Initialize Parameters and set up paths and settings
@@ -71,7 +94,7 @@ def train(args,P):
     batch_size = args.batch_size
     shuffle = args.shuffle
     device = args.device
-    save_path =  os.path.join("/home/kia/Multi-Task-Network/Saved")
+    save_path =  os.path.join("/home/kia/Multi-Task-Network/Saved/")
     pre_trained = args.pre_trained
     #os.makedirs(save_path, exist_ok=True)
 
@@ -91,7 +114,10 @@ def train(args,P):
 
     # Initialize validation dataset and dataloader
     val_dataset = LabelGenerator(val_data_path, val_label_path, save_path, image_size=(640, 640), normalize=True, class_mapping=class_mapping,train=False)
-    val_dataloader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=num_workers)
+    val_dataloader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=num_workers)
+    first_batch = next(iter(val_dataloader))
+
+    # test_laoder = [first_batch] * 20
 
     # Initialize model
     model = MultiNet().to(device)
@@ -101,30 +127,37 @@ def train(args,P):
         model.load_state_dict(torch.load(pre_trained, map_location="cuda")) 
 
     # Initialize optimizer and loss function
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0008)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
     loss_fn = Loss.ComputeLoss()
     accuracy_fn = Accuracy()
-
+    scaler =  torch.cuda.amp.GradScaler()
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
     # Training loop
     for epoch in range(epochs):
 
 
         model.train()  # Set model in training mode
 
-        train_loss , train_drivable_iou_acc ,  train_lane_iou_acc , train_drivable_f1_acc ,  train_lane_f1_acc = train_step(model=model,
-                                                                                                                            dataloader=train_dataloader,
-                                                                                                                            loss_fn=loss_fn,
-                                                                                                                            accuracy_fn = accuracy_fn,
-                                                                                                                            optimizer=optimizer
-                                                                                                                            ,device = device)
-
+        model , train_loss  = train_step(model=model,
+                                        dataloader=train_datalaoder,
+                                        loss_fn=loss_fn,
+                                        accuracy_fn = accuracy_fn,
+                                        optimizer=optimizer,
+                                        grad_scaler = scaler
+                                        ,device = device)
         print(
             f"Epoch: {epoch+1} | "
             f"train_loss: {train_loss:.4f} | "
-            f"train_drivable_iou_acc: {train_drivable_iou_acc:.4f} | "
-            f"train_lane_iou_acc: {train_lane_iou_acc:.4f} | "
-            f"train_drivable_f1_acc: {train_drivable_f1_acc:.4f} | "
-            f"train_lane_f1_acc: {train_lane_f1_acc:.4f} | "
+
+        )
+        val_score , drivable_score , lane_score  = evaluate(model, val_dataloader, device)
+        scheduler.step(val_score)
+
+        print(
+            f"Validation: {epoch+1} | "
+            f"total: {val_score:.4f} | "
+            f"drivable acc: {drivable_score:.4f} | "
+            f"lane acc: {lane_score:.4f} | "
         )
         
         ## TensorBoard Summaries
@@ -137,17 +170,14 @@ def train(args,P):
 
 
         results["train_loss"].append(train_loss)
-        results["train_drivable_iou_acc"].append(train_drivable_iou_acc)
-        results["train_lane_iou_acc"].append(train_lane_iou_acc)
-        results["train_drivable_f1_acc"].append(train_drivable_f1_acc)
-        results["train_lane_f1_acc"].append(train_lane_f1_acc)
+        if val_score>0.95:
+            break
 
-        torch.save(
-            model.state_dict(),
-            save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pkl'
-        )
+    torch.save(
+        model.state_dict(),
+        save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pth'
+    )
 
-        
     print("Training complete")
     # writer.close()
     return results , model

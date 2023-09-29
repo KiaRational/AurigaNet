@@ -52,4 +52,4 @@ class Parameters():
     # Train Parameters
     ##############################################################################
     
-    epoch_number = 50
+    epoch_number = 25

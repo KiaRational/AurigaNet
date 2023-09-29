@@ -47,7 +47,7 @@ class LabelGenerator(Dataset):
     def __getitem__(self, index):
 
         annotation = self.data_loader.annotations[index]
-
+        print(annotation['name'])
         image  , cluster_mask , instance_drivable  , objects_annotations = self.data_loader.process(annotation)
 
         confidence_mask = np.zeros_like(cluster_mask)

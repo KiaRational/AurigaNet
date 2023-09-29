@@ -35,3 +35,7 @@ class Accuracy:
         f1_score = 2 * (precision * recall) / (precision + recall + 1e-7)
         
         return f1_score.mean()
+
+
+
+        

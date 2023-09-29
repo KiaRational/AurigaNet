@@ -13,7 +13,7 @@ from seg_utils.Parameters import Parameters
 
 
 class ConvBNSiLU(nn.Sequential):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias=False):
         super().__init__(
             nn.Conv2d(in_channels, out_channels, kernel_size,
                       padding=padding, stride=stride, bias=bias),

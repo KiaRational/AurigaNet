@@ -49,7 +49,7 @@ class MultiNet(nn.Module):
 
         # # self.Seg = SegNeck()
 
-        self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
+        # self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
 
     def forward(self, x):
         """

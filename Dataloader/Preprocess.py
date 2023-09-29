@@ -20,7 +20,7 @@ from seg_utils.Parameters import Parameters
 
 
 class CustomDataLoader:
-    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=True):
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=False):
         self.data_path = data_path
         self.p = Parameters()
         self.image_size = image_size

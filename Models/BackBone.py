@@ -14,11 +14,11 @@ class ConvBNSiLU(nn.Sequential):
         stride (int): Stride used for the convolution operation.
         bias (bool, optional): Whether to include bias in the convolutional layer. Default is True.
     """
-    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=True):
+    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=False):
         super().__init__(
             nn.Conv2d(in_channels, n_filters, k_size, padding=padding, stride=stride, bias=bias),
             nn.BatchNorm2d(n_filters),
-            nn.SiLU(inplace=False),
+            nn.SiLU(inplace=True),
         )
 
 class BottleNeck(nn.Module):

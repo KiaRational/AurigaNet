@@ -23,11 +23,11 @@ class ConvBNReLU(nn.Sequential):
         stride (int): Stride used for the convolution operation.
         bias (bool, optional): Whether to include bias in the convolutional layer. Default is True.
     """
-    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=True):
+    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=False):
         super().__init__(
             nn.Conv2d(in_channels, n_filters, k_size, padding=padding, stride=stride, bias=bias),
             nn.BatchNorm2d(n_filters, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
         )
 
 class DownsampleConv(nn.Sequential):
@@ -146,7 +146,7 @@ class Output(nn.Module):
         super(Output, self).__init__()
         self.conv1 = ConvBNReLU(in_channels, in_channels//4, 3, 1, 1)
         self.conv2 = ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1)
-        self.conv3 = ConvBNReLU(in_channels//8, out_channels, 1, 0, 1)
+        self.conv3 = nn.Conv2d(in_channels//8, out_channels, kernel_size=1, padding=0, stride=1, bias=False)
 
     def forward(self, x):
         x = self.conv1(x)

@@ -7,6 +7,7 @@ from  tqdm import  tqdm
 import torch.nn.functional as F
 import argparse
 import torch.multiprocessing as mp
+import matplotlib.pyplot as plt
 # from torch.utils.tensorboard import SummaryWriter
 
 # Add the project root to the sys path
@@ -15,7 +16,8 @@ sys.path.append(project_root)
 
 # Import specific modules
 from   Dataloader.Dataset import LabelGenerator, DataLoaderX
-from   Models.MultiNet import MultiNet
+# from   Models.unet_model import UNet as MultiNet
+from Models.MultiNet import MultiNet
 from   seg_utils.Parameters import Parameters
 import seg_utils.losses as Loss
 from   seg_utils.accuracy import Accuracy
@@ -45,7 +47,7 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,grad_scaler,device
 
         optimizer.zero_grad(set_to_none=True)
         grad_scaler.scale(loss).backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         grad_scaler.step(optimizer)
         grad_scaler.update()
         total_loss += loss.item()
@@ -53,6 +55,8 @@ def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,grad_scaler,device
 
     return model , (total_loss / len(dataloader))
 
+def activation(x):
+    return 1e-7 + (1 - 2 * 1e-7) * (0.5 + torch.arctan(x)/torch.tensor(np.pi))
 
 @torch.inference_mode()
 def evaluate(net, dataloader, device):
@@ -72,11 +76,20 @@ def evaluate(net, dataloader, device):
             # predict the mask
             predictions = net(image)
             Pred_Confidence , Pred_EmbeddingFeatureArea = predictions
+            # Pred_Confidence = predictions
             Pred_Confidence_Drivable = Pred_Confidence[:,0,:,:]
             Pred_Confidence_Lane = Pred_Confidence[:,1,:,:]
-            dice_score_lane += Loss.dice_coeff(F.sigmoid(Pred_Confidence_Lane),confidence_mask[:,1,:,:],reduce_batch_first=True)
-            dice_score_area += Loss.dice_coeff(F.sigmoid(Pred_Confidence_Drivable),confidence_mask[:,0,:,:],reduce_batch_first=True)
-            dice_score += Loss.multiclass_dice_coeff(F.sigmoid(Pred_Confidence), confidence_mask, reduce_batch_first=True)
+            dice_score_lane += Loss.dice_coeff(activation(Pred_Confidence_Lane),confidence_mask[:,1,:,:],reduce_batch_first=True)
+            dice_score_area += Loss.dice_coeff(activation(Pred_Confidence_Drivable),confidence_mask[:,0,:,:],reduce_batch_first=True)
+            dice_score += Loss.multiclass_dice_coeff(activation(Pred_Confidence), confidence_mask, reduce_batch_first=True)
+    output = net(image)
+    output=activation(output[0][0])            
+    drivable_area_mask = output[0,:,:].cpu().numpy()
+    lane_mask = output[1,:,:].cpu().numpy()
+    plt.imshow(drivable_area_mask)
+    plt.savefig("/home/kia/Multi-Task-Network/Saved/saved_area.png")
+    plt.imshow(lane_mask)
+    plt.savefig("/home/kia/Multi-Task-Network/Saved/saved_lane.png")
 
     net.train()
     return dice_score / max(num_val_batches, 1) , dice_score_area / max(num_val_batches, 1) , dice_score_lane / max(num_val_batches, 1)
@@ -109,17 +122,18 @@ def train(args,P):
     }
 
     # Initialize training dataset and dataloader
-    train_dataset = LabelGenerator(train_data_path, train_label_path, save_path, image_size=(640, 640), normalize=True, class_mapping=class_mapping)
-    train_dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=False, num_workers=num_workers)
+    # train_dataset = LabelGenerator(train_data_path, train_label_path, save_path, image_size=(640, 640), normalize=True, class_mapping=class_mapping)
+    # train_dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=False, num_workers=num_workers)
 
     # Initialize validation dataset and dataloader
     val_dataset = LabelGenerator(val_data_path, val_label_path, save_path, image_size=(640, 640), normalize=True, class_mapping=class_mapping,train=False)
     val_dataloader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=True, pin_memory=False, num_workers=num_workers)
     first_batch = next(iter(val_dataloader))
 
-    # test_laoder = [first_batch] * 20
+    test_laoder = [first_batch] * 20
 
     # Initialize model
+    # model = MultiNet(3,2).to(device)
     model = MultiNet().to(device)
 
     if pre_trained != "":
@@ -127,19 +141,18 @@ def train(args,P):
         model.load_state_dict(torch.load(pre_trained, map_location="cuda")) 
 
     # Initialize optimizer and loss function
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.001)
     loss_fn = Loss.ComputeLoss()
     accuracy_fn = Accuracy()
-    scaler =  torch.cuda.amp.GradScaler()
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
+    scaler =  torch.cuda.amp.GradScaler(enabled=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3 ,verbose=True)
     # Training loop
     for epoch in range(epochs):
-
 
         model.train()  # Set model in training mode
 
         model , train_loss  = train_step(model=model,
-                                        dataloader=train_datalaoder,
+                                        dataloader=test_laoder,
                                         loss_fn=loss_fn,
                                         accuracy_fn = accuracy_fn,
                                         optimizer=optimizer,
@@ -150,8 +163,9 @@ def train(args,P):
             f"train_loss: {train_loss:.4f} | "
 
         )
-        val_score , drivable_score , lane_score  = evaluate(model, val_dataloader, device)
-        scheduler.step(val_score)
+        scheduler.step(train_loss)
+
+        val_score , drivable_score , lane_score  = evaluate(model, test_laoder, device)
 
         print(
             f"Validation: {epoch+1} | "
@@ -162,16 +176,11 @@ def train(args,P):
         
         ## TensorBoard Summaries
         # writer.add_scalar('training loss ',train_loss , epoch+1)
-        # writer.add_scalar('train drivable mIoU acc ',train_drivable_iou_acc ,  epoch+1)
-        # writer.add_scalar('train drivable f1 acc',train_drivable_f1_acc ,  epoch+1)
-        # writer.add_scalar('train lane f1 acc',train_lane_f1_acc ,  epoch+1)
-        # writer.add_scalar('train lane mIoU acc ',train_lane_iou_acc ,  epoch+1)
         # Update results dictionary
 
 
         results["train_loss"].append(train_loss)
-        if val_score>0.95:
-            break
+        plt.plot(results["train_loss"])
 
     torch.save(
         model.state_dict(),
@@ -179,6 +188,7 @@ def train(args,P):
     )
 
     print("Training complete")
+    plt.savefig("/home/kia/Multi-Task-Network/Saved/")
     # writer.close()
     return results , model
 

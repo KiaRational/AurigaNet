@@ -12,6 +12,8 @@ sys.path.append(project_root)
 
 # Import specific modules
 from   Models.MultiNet import MultiNet
+def activation(x):
+    return 1e-7 + (1 - 2 * 1e-7) * (0.5 + torch.arctan(x)/torch.tensor(np.pi))
 
 class SegmentationTester:
     def __init__(self, model_path, image_path, device='cuda'):
@@ -45,13 +47,13 @@ class SegmentationTester:
             # image = image.transpose((2, 0, 1))
             print(image.shape)
             output = self.model(image)
-            output=F.sigmoid(output[0][0])
+            output=activation(output[0][0])
         # Convert the output to a NumPy array
         output_array = output
 
         drivable_area_mask = output_array[0,:,:].cpu().numpy()
         lane_mask = output_array[1,:,:].cpu().numpy()
-        # lane_mask[lane_mask<0]=0
+        # lane_mask[lane_mask<0.1]=0
         # drivable_area_mask[drivable_area_mask>0.3]=1
         plt.imshow(drivable_area_mask)
         plt.show()
@@ -60,9 +62,11 @@ class SegmentationTester:
 # Example usage:
 if __name__ == "__main__":
 
-    model_path = '/home/kia/Multi-Task-Network/Saved/14_0.0052637199871242045_AurigaNet.pth'
-    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/c698371e-5626f7bb.jpg'
+    model_path = '/home/kia/Multi-Task-Network/Saved/29_0.021674420218914747_AurigaNet.pth'
+    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/bd57e60e-187054e3.jpg'
 
     tester = SegmentationTester(model_path, image_path)
     result = tester.test()
     print(result.shape)  # Print the shape of the segmentation mask
+
+

@@ -5,7 +5,7 @@ from torch import Tensor
 import math
 import os 
 import sys
-
+import numpy as np
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -171,6 +171,9 @@ def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
     fn = multiclass_dice_coeff if multiclass else dice_coeff
     return 1 - fn(input, target, reduce_batch_first=True)
 
+def activation(x):
+    return 1e-7 + (1 - 2 * 1e-7) * (0.5 + torch.arctan(x)/torch.tensor(np.pi))
+
 class ComputeLoss(nn.Module) :
 
     def __init__(self):
@@ -184,23 +187,17 @@ class ComputeLoss(nn.Module) :
         Pred_Confidence , Pred_EmbeddingFeatureArea = predictions
 
         GroundTruth_Confidence , GroundTruth_EmbeddingFeatureArea = targets
-
+        # GroundTruth_Confidence  = targets
         GroundTruth_Confidence = GroundTruth_Confidence.to(torch.float32)
 
         SegLoss = self.Segmentation_Confidence_Loss(Pred_Confidence,GroundTruth_Confidence)
         
-        dice = dice_loss(F.sigmoid(Pred_Confidence),GroundTruth_Confidence,multiclass=True)
+        dice = dice_loss(activation(Pred_Confidence),GroundTruth_Confidence,multiclass=True)
         # AreaFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureArea,GroundTruth_EmbeddingFeatureArea)
 
 
-        TotalLoss = self.P.Alpha1 * SegLoss + self.P.Alpha2 * dice 
+        TotalLoss =  self.P.Alpha1*SegLoss + self.P.Alpha2 * dice 
+        # TotalLoss =  dice 
 
         return TotalLoss
         
-        
-gt = torch.empty(1,2,320,320).uniform_(0, 1) 
-gt = torch.bernoulli(gt)
-
-test_zeros = torch.ones_like(gt)
-
-print((multiclass_dice_coeff(test_zeros,gt,reduce_batch_first=True)))

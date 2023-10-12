@@ -21,7 +21,15 @@ class Parameters():
     train_Area_Mask_path = "/home/kia/BDD100K/Generated/train/Area_Mask"
     val_Lane_Mask_path = "/home/kia/BDD100K/Generated/val/Lane_Masks"
     val_Area_Mask_path = "/home/kia/BDD100K/Generated/val/Area_Mask"
-
+    # train_data_path = "/home/ubuntu/BDD100K/bdd100k/images/100k/train/"
+    # train_label_path = '/home/ubuntu/BDD100K/bdd100k/labels/bdd100k_labels_images_train.json'
+    # val_data_path = "/home/ubuntu/BDD100K/bdd100k/images/100k/val/"
+    # val_label_path = '/home/ubuntu/BDD100K/bdd100k/labels/bdd100k_labels_images_val.json'
+    # save_path = '/home/ubuntu/BDD100K/Generated'
+    # train_Lane_Mask_path = "/home/ubuntu/BDD100K/Generated/train/Lane_Masks"
+    # train_Area_Mask_path = "/home/ubuntu/BDD100K/Generated/train/Area_Mask"
+    # val_Lane_Mask_path = "/home/ubuntu/BDD100K/Generated/val/Lane_Masks"
+    # val_Area_Mask_path = "/home/ubuntu/BDD100K/Generated/val/Area_Mask"
     class_mapping = {
         'traffic_light': 0,
         'traffic_sign': 1,
@@ -43,8 +51,8 @@ class Parameters():
     ##############################################################################
 
     K1 = 1.00
-    Alpha1 = 0.5
-    Alpha2 = 0.25
+    Alpha1 = 1
+    Alpha2 = 1
     Alpha3 = 0.25
     
 
@@ -52,4 +60,4 @@ class Parameters():
     # Train Parameters
     ##############################################################################
     
-    epoch_number = 25
+    epoch_number = 30

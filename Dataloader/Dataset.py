@@ -50,10 +50,8 @@ class LabelGenerator(Dataset):
         print(annotation['name'])
         image  , cluster_mask , instance_drivable  , objects_annotations = self.data_loader.process(annotation)
 
-        confidence_mask = np.zeros_like(cluster_mask)
+        confidence_mask = (cluster_mask>0).astype(int)
 
-        confidence_mask[cluster_mask>0]=1
-        
         image = image.transpose((2, 0, 1))
 
         return image, confidence_mask , instance_drivable  

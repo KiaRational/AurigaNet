@@ -205,7 +205,7 @@ class CustomDataLoader:
         uniques = np.unique(k)
         picks = self.local_picks(uniques)
         if len(picks)>1:
-            k = (np.ceil((k)/max(uniques[picks[0]]+10,uniques[picks[1]-1])+30)).astype(np.uint8)
+            k = (np.ceil((k)/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8)
 
         elif len(picks)==1:
             

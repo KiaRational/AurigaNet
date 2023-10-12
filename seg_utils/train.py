@@ -24,6 +24,7 @@ from   seg_utils.accuracy import Accuracy
 
 
 def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,grad_scaler,device):
+
     total_loss = 0
     total_f1_lane = 0
     total_iou_drivable =0
@@ -62,9 +63,9 @@ def activation(x):
 def evaluate(net, dataloader, device):
     net.eval()
     num_val_batches = len(dataloader)
-    dice_score = 0
-    dice_score_lane = 0
-    dice_score_area = 0
+    iou = 0
+    iou_lane = 0
+    iou_area = 0
     # iterate over the validation set
     with torch.autocast(device):
         for i, (images, confidence_mask, instance_drivable  ) in enumerate(tqdm(dataloader)):
@@ -77,22 +78,25 @@ def evaluate(net, dataloader, device):
             predictions = net(image)
             Pred_Confidence , Pred_EmbeddingFeatureArea = predictions
             # Pred_Confidence = predictions
-            Pred_Confidence_Drivable = Pred_Confidence[:,0,:,:]
-            Pred_Confidence_Lane = Pred_Confidence[:,1,:,:]
-            dice_score_lane += Loss.dice_coeff(activation(Pred_Confidence_Lane),confidence_mask[:,1,:,:],reduce_batch_first=True)
-            dice_score_area += Loss.dice_coeff(activation(Pred_Confidence_Drivable),confidence_mask[:,0,:,:],reduce_batch_first=True)
-            dice_score += Loss.multiclass_dice_coeff(activation(Pred_Confidence), confidence_mask, reduce_batch_first=True)
+            Pred_Confidence_Drivable = activation(Pred_Confidence[:,0,:,:])
+            Pred_Confidence_Lane = activation(Pred_Confidence[:,1,:,:])
+            # Calculate IoU for Drivable Area
+            iou_area += Loss.calculate_iou(Pred_Confidence_Drivable > 0.5, confidence_mask[:, 0, :, :])
+
+            # Calculate IoU for Lane
+            iou_lane += Loss.calculate_iou(Pred_Confidence_Lane > 0.5, confidence_mask[:, 1, :, :])
+
     output = net(image)
     output=activation(output[0][0])            
     drivable_area_mask = output[0,:,:].cpu().numpy()
     lane_mask = output[1,:,:].cpu().numpy()
     plt.imshow(drivable_area_mask)
-    plt.savefig("/home/kia/Multi-Task-Network/Saved/saved_area.png")
+    plt.savefig("/home/ubuntu/Multi-Task-Network/Saved/saved_area.png")
     plt.imshow(lane_mask)
-    plt.savefig("/home/kia/Multi-Task-Network/Saved/saved_lane.png")
+    plt.savefig("/home/ubuntu/Multi-Task-Network/Saved/saved_lane.png")
 
     net.train()
-    return dice_score / max(num_val_batches, 1) , dice_score_area / max(num_val_batches, 1) , dice_score_lane / max(num_val_batches, 1)
+    return ((iou_area + iou_lane)/2) / max(num_val_batches, 1) , iou_area / max(num_val_batches, 1) , iou_lane / max(num_val_batches, 1)
 
 def train(args,P):
     # Initialize Parameters and set up paths and settings
@@ -107,15 +111,13 @@ def train(args,P):
     batch_size = args.batch_size
     shuffle = args.shuffle
     device = args.device
-    save_path =  os.path.join("/home/kia/Multi-Task-Network/Saved/")
+    save_path =  os.path.join("/home/ubuntu/Multi-Task-Network/Saved/")
     pre_trained = args.pre_trained
     #os.makedirs(save_path, exist_ok=True)
 
     # Create a dictionary to store results
     results = {"train_loss": [],
-        "train_lane_f1_acc": [],
         "train_lane_iou_acc": [],
-        "train_drivable_f1_acc": [],
         "train_drivable_iou_acc": [],
         "test_loss": [],
         "test_acc": []
@@ -180,15 +182,25 @@ def train(args,P):
 
 
         results["train_loss"].append(train_loss)
-        plt.plot(results["train_loss"])
+        results["train_lane_iou_acc"].append(lane_score)
+        results["train_drivable_iou_acc"].append(drivable_score)
 
-    torch.save(
-        model.state_dict(),
-        save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pth'
-    )
+        plt.plot(results["train_loss"],label="train_loss")
+        plt.plot(results["train_lane_iou_acc"],label="train_lane_iou_acc")
+        plt.plot(results["train_drivable_iou_acc"],label="train_drivable_iou_acc")
+
+        plt.legend()
+
+
+
+        torch.save(
+            model.state_dict(),
+            save_path+str(epoch)+'_'+str(train_loss)+'_'+'AurigaNet.pth'
+        )
 
     print("Training complete")
-    plt.savefig("/home/kia/Multi-Task-Network/Saved/")
+    plt.savefig("/home/ubuntu/Multi-Task-Network/Saved/loss.png")
+
     # writer.close()
     return results , model
 
@@ -212,7 +224,7 @@ if __name__ == "__main__":
     # parser.add_argument("--data_path", type=str, help="Path to data.")
     # parser.add_argument("--label_path", type=str, help="Path to labels.")
     parser.add_argument("--pre_trained", type=str, default= "",help="Path to pre trained model.")
-    parser.add_argument("--save_path", type=str, default="/home/kia/Multi-Task-Network/" ,help="Path to save results.")
+    parser.add_argument("--save_path", type=str, default="/home/ubuntu/Multi-Task-Network/" ,help="Path to save results.")
     parser.add_argument("--device",type=str ,default="cuda", help="choose your training device cuda or cpu")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of workers for dataloader.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size.")

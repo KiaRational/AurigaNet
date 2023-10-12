@@ -173,7 +173,12 @@ def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
 
 def activation(x):
     return 1e-7 + (1 - 2 * 1e-7) * (0.5 + torch.arctan(x)/torch.tensor(np.pi))
-
+    
+def calculate_iou(prediction, target):
+    intersection = torch.logical_and(prediction, target).sum()
+    union = torch.logical_or(prediction, target).sum()
+    iou = float(intersection) / float(union)
+    return iou
 class ComputeLoss(nn.Module) :
 
     def __init__(self):

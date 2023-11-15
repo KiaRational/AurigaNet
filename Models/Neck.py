@@ -8,7 +8,6 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 
-
 class ConvBNSiLU(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias=True):
         super().__init__(

@@ -53,9 +53,19 @@ class LabelGenerator(Dataset):
         confidence_mask = (cluster_mask>0).astype(int)
 
         image = image.transpose((2, 0, 1))
+        image = torch.tensor(image)
+        confidence_mask = torch.tensor(confidence_mask)
+        return image, [confidence_mask , instance_drivable , objects_annotations]
 
-        return image, confidence_mask , instance_drivable  
-
+    def collate_fn(batch):
+        image, label= zip(*batch)
+        label_det, label_seg, label_inst = [], [], []
+        for i , (confidence_mask , instance_drivable , objects_annotations) in enumerate(label):
+            objects_annotations[:, 0] = i  # add target image index for build_targets()
+            label_det.append(objects_annotations)
+            label_seg.append(confidence_mask)
+            label_inst.append(instance_drivable)
+        return torch.stack(image, 0), torch.stack(label_seg, 0), torch.stack(label_inst, 0), torch.cat(label_det, 0)
 
 class DataLoaderX(DataLoader):
     """prefetch dataloader"""

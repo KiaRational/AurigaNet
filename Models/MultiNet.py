@@ -11,11 +11,6 @@ from Models.Neck import Neck
 from Models.SegHead import SegHead
 from Models.ObjHead import Object
 
-ANCHORS = torch.tensor([
-    [[10, 13], [16, 30], [33, 23]],  # P3/8
-    [[30, 61], [62, 45], [59, 119]],  # P4/16
-    [[116, 90], [156, 198], [373, 326]] # P5/32
-]).detach().requires_grad_(False).float()
 
 
 class MultiNet(nn.Module):
@@ -30,6 +25,12 @@ class MultiNet(nn.Module):
     """
     def __init__(self): # TODO object_hyp will be moved to somewhere else in the future
         super(MultiNet, self).__init__()
+        
+        ANCHORS = torch.tensor([
+            [[10, 13], [16, 30], [33, 23]],  # P3/8
+            [[30, 61], [62, 45], [59, 119]],  # P4/16
+            [[116, 90], [156, 198], [373, 326]] # P5/32
+        ]).detach().requires_grad_(False).float()
 
         out_channels_list = [64,128,256,512]
         w = 4 #width coefficient
@@ -49,7 +50,7 @@ class MultiNet(nn.Module):
 
         # # self.Seg = SegNeck()
 
-        # self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
+        self.Obj = Object(ANCHORS, out_channels_list=out_channels_list,w=w,r=r,d=d)
 
     def forward(self, x):
         """
@@ -63,11 +64,11 @@ class MultiNet(nn.Module):
         """
         Half, Quarter, Octant, One_sixteenth  = self.BackBone(x)
         Octant_out , One_sixteenth_out , One_thirty_second_out = self.Neck(Octant,One_sixteenth)
-        Out = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
+        Out_seg = self.Seg(Half, Quarter, Octant_out, One_sixteenth_out)
 
-        # Out = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
+        Out_obj = self.Obj(Octant_out , One_sixteenth_out , One_thirty_second_out) # object predictions
         # Out = [Half, Quarter, Octant, One_sixteenth]
-        return Out
+        return [Out_seg[0],Out_seg[1],Out_obj]
 
 if __name__ == "__main__":
 

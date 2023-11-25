@@ -34,13 +34,14 @@ class CustomDataLoader:
         self.transform = transform
 
         if self.transform :
+            # CoarseDropout is not defined for object => what does it do?
             self.transforms = A.Compose(transforms=[
                                                 RandomShadow(prob=0.50),
                                                 A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, p=0.5),
                                                 A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, p=0.5),
                                                 A.GaussNoise(var_limit=(0, 255), p=0.1),
                                                 A.MotionBlur(blur_limit=17, p=0.1),
-                                                A.CoarseDropout(max_holes=6, max_height=32, max_width=32, p=0.1),
+                                                # A.CoarseDropout(max_holes=6, max_height=32, max_width=32, p=0.1),
                                                 A.ImageCompression(quality_lower=39, quality_upper=60, p=0.2),
                                                 A.HorizontalFlip(p=0.2),
                                                 A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.075, rotate_limit=20, p=0.2,border_mode=cv2.BORDER_CONSTANT)
@@ -206,7 +207,7 @@ class CustomDataLoader:
 
                 # xc, yc, wb, hb = self.format_yolo(
                 #     [box_center_x, box_center_y, box_width, box_height])
-
+                # add boxes with coco format
                 obj_annot.append(np.array([0 , class_index, box_center_x, box_center_y, box_width, box_height]))
 
         if CreateMasks:

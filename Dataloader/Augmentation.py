@@ -35,6 +35,7 @@ def add_random_shadow(image, min_alpha=0.25, max_alpha=0.45):
 
     return shadowed_image
 
+
 class RandomShadow(ImageOnlyTransform):
     """
     RamdomA transformation

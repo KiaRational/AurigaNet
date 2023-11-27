@@ -313,4 +313,3 @@ class CustomDataLoader:
     def normalize_image(self, image):
         return image.astype(np.float32) / 255.0
 
-

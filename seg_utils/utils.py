@@ -11,6 +11,8 @@ import time
 from torchvision.ops import nms
 import matplotlib.patches as patches
 import random
+from collections import Counter
+
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -18,6 +20,38 @@ sys.path.append(project_root)
 # Import specific modules
 from   Models.MultiNet import MultiNet
 import seg_utils.Parameters as Parameters
+
+
+def iou_width_height(box1, box2):
+    """
+    Calculate Intersection over Union (IoU) between two bounding boxes.
+
+    Parameters:
+    - box1: List or array-like, representing [x1, y1, x2, y2] of the first box.
+    - box2: List or array-like, representing [x1, y1, x2, y2] of the second box.
+
+    Returns:
+    - iou: Intersection over Union (IoU) value.
+    """
+
+    # Calculate the coordinates of the intersection rectangle
+    x_intersection = max(0, min(box1[2], box2[2]) - max(box1[0], box2[0]))
+    y_intersection = max(0, min(box1[3], box2[3]) - max(box1[1], box2[1]))
+
+    # Calculate area of intersection rectangle
+    area_intersection = x_intersection * y_intersection
+
+    # Calculate area of each bounding box
+    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    # Calculate area of union between the boxes
+    area_union = area_box1 + area_box2 - area_intersection
+
+    # Calculate IoU
+    iou = 0 if area_union == 0 else area_intersection / area_union
+
+    return iou
 
 def non_max_suppression(batch_bboxes, iou_threshold, threshold, max_detections=300, tolist=True):
 
@@ -155,3 +189,110 @@ def plot_image(image, boxes, labels):
         )
     # plt.show()
     return im
+
+
+def xywh2xyxy(x):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
+    y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
+    y[..., 2] = x[..., 0] + x[..., 2] / 2  # bottom right x
+    y[..., 3] = x[..., 1] + x[..., 3] / 2  # bottom right y
+    return y
+
+def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] normalized where xy1=top-left, xy2=bottom-right
+    if clip:
+        clip_boxes(x, (h - eps, w - eps))  # warning: inplace clip
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = ((x[:, 0] + x[:, 2]) / 2) / w  # x center
+    y[:, 1] = ((x[:, 1] + x[:, 3]) / 2) / h  # y center
+    y[:, 2] = (x[:, 2] - x[:, 0]) / w  # width
+    y[:, 3] = (x[:, 3] - x[:, 1]) / h  # height
+    return y
+
+
+def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None):
+    # Rescale boxes (xyxy) from img1_shape to img0_shape
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    boxes[..., [0, 2]] -= pad[0]  # x padding
+    boxes[..., [1, 3]] -= pad[1]  # y padding
+    boxes[..., :4] /= gain
+    clip_boxes(boxes, img0_shape)
+    return boxes
+
+def clip_boxes(boxes, shape):
+    # Clip boxes (xyxy) to image shape (height, width)
+    if isinstance(boxes, torch.Tensor):  # faster individually
+        boxes[..., 0].clamp_(0, shape[1])  # x1
+        boxes[..., 1].clamp_(0, shape[0])  # y1
+        boxes[..., 2].clamp_(0, shape[1])  # x2
+        boxes[..., 3].clamp_(0, shape[0])  # y2
+    else:  # np.array (faster grouped)
+        boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
+        boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
+
+
+
+def mAP(label, pred, class_num=10):
+    # Convert label and pred to numpy arrays
+    pred =pred.cpu().numpy()
+    label_boxes = label[..., 2:] * 640
+    label_boxess = np.zeros_like(label_boxes.numpy())
+    label_boxess[:, 0] = label_boxes[..., 0] - label_boxes[..., 2] / 2
+    label_boxess[:, 1] = label_boxes[..., 1] - label_boxes[..., 3] / 2
+    label_boxess[:, 2] = label_boxes[..., 0] + label_boxes[..., 2] / 2
+    label_boxess[:, 3] = label_boxes[..., 1] + label_boxes[..., 3] / 2
+    
+    label_classes = label[..., 1]
+    pred_classes = pred[:, 0]
+    pred_boxes = pred[:, 2:]
+    pred_scores = pred[:, 1]
+    matches = []
+    np.set_printoptions(suppress=True)
+
+    # Initialize TPFP50 and TPFP75 arrays
+    TPFP50 = np.zeros((class_num, 2))  # |FP|TP|
+    TPFP75 = np.zeros((class_num, 2))
+
+    # Count occurrences of predicted classes
+    counter = Counter(pred_classes)
+    pred_counts = list(counter.items())
+
+    for pred_count in pred_counts:
+        TPFP50[int(pred_count[0]), 0] = int(pred_count[1])
+        TPFP75[int(pred_count[0]), 0] = int(pred_count[1])
+
+
+    for i, pred_box in enumerate(pred_boxes):
+        ious = [iou_width_height(torch.tensor(pred_box), torch.tensor(label_box))
+                for label_box in label_boxess]
+
+        index = np.array(ious).argmax()
+
+        if ious[index] >= 0.5:
+            if pred_classes[i] == label_classes[index]:
+                TPFP50[int(pred_classes[i]), 1] += 1  # count as TP
+                TPFP50[int(pred_classes[i]), 0] -= 1
+                if ious[index] < 0.75:
+                    matches.append((int(pred_classes[i]), i, index, ious[index]))
+        else:
+            if pred_classes[i] == label_classes[index]:
+                TPFP50[int(pred_classes[i]), 0] += 1  # count as FP
+
+        if ious[index] >= 0.75:
+            if pred_classes[i] == label_classes[index]:
+                TPFP75[int(pred_classes[i]), 1] += 1
+                TPFP75[int(pred_classes[i]), 0] -= 1
+                matches.append((int(pred_classes[i]), i, index, ious[index]))
+        else:
+            if pred_classes[i] == label_classes[index]:
+                TPFP75[int(pred_classes[i]), 0] += 1  # count as FP
+    return TPFP50, TPFP75
+

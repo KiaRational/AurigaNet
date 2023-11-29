@@ -189,8 +189,11 @@ class CustomDataLoader:
 
         else:
             return torch.from_numpy(np.array(obj_annot))
+
     def format_yolo(self, box):
+
         xc, yc, wb, hb = box[0]/(640), box[1]/640, box[2]/640, box[3]/640
+        
         return xc, yc, wb, hb
 
     def local_picks(self,array):

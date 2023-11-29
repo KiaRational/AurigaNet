@@ -45,7 +45,7 @@ class LabelGenerator(Dataset):
 
     
     def __getitem__(self, index):
-
+        shapes = (640, 640), ((1, 1), 0)
         annotation = self.data_loader.annotations[index]
         print(annotation['name'])
         image  , cluster_mask , instance_drivable  , objects_annotations = self.data_loader.process(annotation)

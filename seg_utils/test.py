@@ -9,21 +9,30 @@ import matplotlib.pyplot as plt
 import time
 from torchvision.ops import nms
 import matplotlib.patches as patches
+import matplotlib
+from torchmetrics.detection import MeanAveragePrecision
 import random
+from collections import Counter
 # Add the project root to the sys path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 # Import specific modules
 from   Models.MultiNet import MultiNet
-import seg_utils.Parameters as Parameters
+from seg_utils.Parameters import Parameters
+from Dataloader.Preprocess import CustomDataLoader
+import seg_utils.utils as utils
+
+matplotlib.use('GTK3Agg')
+
+
 def activation(x):
     return 1e-7 + (1 - 2 * 1e-7) * (0.5 + torch.arctan(x)/torch.tensor(np.pi))
 
 class SegmentationTester:
-    def __init__(self, model_path, image_path, device='cuda'):
+    def __init__(self, model_path, image_path,image_name, device='cuda'):
         self.device = device
-        self.P = Parameters
+        self.P = Parameters()
         # Load the model checkpoint and extract the state_dict
         self.model = MultiNet()  # Replace with your segmentation model class
         self.model.load_state_dict(torch.load(model_path, map_location="cuda")) 
@@ -51,6 +60,17 @@ class SegmentationTester:
         ]
 
         self.image_path = image_path
+
+        val_data_path = self.P.val_data_path
+        val_label_path = self.P.val_label_path
+        save_path = self.P.save_path
+        class_mapping = self.P.class_mapping
+        epochs = self.P.epoch_number
+        self.val_dataset = CustomDataLoader(data_path = val_data_path, label_path = val_label_path, image_size=(640, 640), normalize=True, class_mapping=class_mapping,train=False)
+        for i in range(len(self.val_dataset.annotations)):
+            if image_name == self.val_dataset.annotations[i]['name']:
+                _  , _ , _  , self.objects_annotations = self.val_dataset.process(self.val_dataset.annotations[i])
+                print("_____________found_____________________")
     def local_picks(self,array):
         last = 0
         picks = []
@@ -66,7 +86,7 @@ class SegmentationTester:
         picks = self.local_picks(uniques)
         print(picks)
         if len(picks)>1:
-            k = (np.ceil((k)/(max(uniques[picks[0]],uniques[picks[1]-1])-25))).astype(np.uint8)
+            k = (np.ceil((k)/(max(uniques[picks[0]],uniques[picks[1]-1])))).astype(np.uint8)
 
         elif len(picks)==1:
             
@@ -249,7 +269,68 @@ class SegmentationTester:
             one_hot[:, :, i] = (arr == value)
 
         return one_hot
+
+    def mAP(self, label, pred, class_num=10):
+
+        # Convert label and pred to numpy arrays
+        pred = np.array(pred)
+        label_boxes = label[..., 2:] * 640
+        label_boxess = np.zeros_like(label_boxes.numpy())
+        label_boxess[:, 0] = label_boxes[..., 0] - label_boxes[..., 2] / 2
+        label_boxess[:, 1] = label_boxes[..., 1] - label_boxes[..., 3] / 2
+        label_boxess[:, 2] = label_boxes[..., 0] + label_boxes[..., 2] / 2
+        label_boxess[:, 3] = label_boxes[..., 1] + label_boxes[..., 3] / 2
+        label_classes = label[..., 1]
+        pred_classes = pred[0, :, 0]
+        pred_boxes = pred[0, :, 2:]
+        pred_scores = pred[0, :, 1]
+        matches = []
+        np.set_printoptions(suppress=True)
+
+        # Initialize TPFP50 and TPFP75 arrays
+        TPFP50 = np.zeros((class_num, 2))  # |FP|TP|
+        TPFP75 = np.zeros((class_num, 2))
+
+        # Count occurrences of predicted classes
+        counter = Counter(pred_classes)
+        pred_counts = list(counter.items())
+
+        for pred_count in pred_counts:
+            TPFP50[int(pred_count[0]), 0] = int(pred_count[1])
+            TPFP75[int(pred_count[0]), 0] = int(pred_count[1])
+
+
+        for i, pred_box in enumerate(pred_boxes):
+            ious = [utils.iou_width_height(torch.tensor(pred_box), torch.tensor(label_box))
+                    for label_box in label_boxess]
+
+            index = np.array(ious).argmax()
+
+            if ious[index] >= 0.5:
+                if pred_classes[i] == label_classes[index]:
+                    TPFP50[int(pred_classes[i]), 1] += 1  # count as TP
+                    TPFP50[int(pred_classes[i]), 0] -= 1
+                    if ious[index] < 0.75:
+                        matches.append((int(pred_classes[i]), i, index, ious[index]))
+            else:
+                if pred_classes[i] == label_classes[index]:
+                    TPFP50[int(pred_classes[i]), 0] += 1  # count as FP
+
+            if ious[index] >= 0.75:
+                if pred_classes[i] == label_classes[index]:
+                    TPFP75[int(pred_classes[i]), 1] += 1
+                    TPFP75[int(pred_classes[i]), 0] -= 1
+                    matches.append((int(pred_classes[i]), i, index, ious[index]))
+            else:
+                if pred_classes[i] == label_classes[index]:
+                    TPFP75[int(pred_classes[i]), 0] += 1  # count as FP
+        return TPFP50, TPFP75
+
+
+
+
     def test(self):
+
         with torch.no_grad():
             image = self.preprocess_image(self.image_path)
             # image = image.transpose((2, 0, 1))
@@ -259,11 +340,12 @@ class SegmentationTester:
             out = output[1]
             obj_out = output[2]
             output=activation(output[0][0])
-        # Convert the output to a NumPy array
+        # Convert the outrain_data_path = P.train_data_path
 
         S = [8, 16, 32]
         boxes = self.cells_to_bboxes(obj_out, self.anchors, S, to_list=False, is_pred=True)
-        boxes = self.non_max_suppression(boxes, iou_threshold=0.6, threshold=.25, max_detections=300)
+        boxes = self.non_max_suppression(boxes, iou_threshold=0.5, threshold=.25, max_detections=300)
+        self.mAP(self.objects_annotations,boxes)
         im = self.plot_image(image[0].permute(1, 2, 0).to("cpu"), boxes[0],self.bdd)
         output_array = output
         out = out[:,:,:,:].cpu().numpy()
@@ -292,10 +374,10 @@ class SegmentationTester:
         # eroded = cv2.erode(drivable_area_mask, None, iterations=3)
 
         img = ((((cv2.resize(drivable_area_mask,(40,40),cv2.INTER_NEAREST))>0.5).astype(np.float32))*img).astype(np.uint8)
+
+        img = self.clusterize(img)
         # plt.imshow(img)
         # plt.show()
-        img = self.clusterize(img)
-
         Feature_masks=self.one_hot_encode(img)
 
         for i in range(Feature_masks.shape[2]):
@@ -318,10 +400,11 @@ class SegmentationTester:
 # Example usage:
 if __name__ == "__main__":
 
-    model_path = '/home/kia/Multi-Task-Network/Saved/19_0.11684219054877758_AurigaNet.pth'
-    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/bcbf4834-ad592e12.jpg'
-
-    tester = SegmentationTester(model_path, image_path)
+    model_path = '/home/kia/Multi-Task-Network/Saved/24_0.0946743194013834_AurigaNet.pth'
+    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/c3cae07c-b1c025cf.jpg'
+    image_name = 'c3cae07c-b1c025cf.jpg'
+    
+    tester = SegmentationTester(model_path, image_path, image_name)
     result = tester.test()
     print(result.shape)  # Print the shape of the segmentation mask
 

@@ -28,7 +28,7 @@ from seg_utils.utils import non_max_suppression,cells_to_bboxes,make_grids,plot_
 def train_step(model,dataloader,loss_fn,accuracy_fn,optimizer,grad_scaler,device,SegOnly=False):
 
     total_loss = 0
-    total_cls_loss = 0
+    total_cls_loss , total obj_loss , total_bbx_loss  = 0 , 0 , 0
     total_iou_drivable =0
     total_iou_lane = 0
     total_bbx_loss = 0

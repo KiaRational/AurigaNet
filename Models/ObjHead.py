@@ -120,7 +120,7 @@ class ObjDetect(nn.Module):
         self.stride = [8, 16, 32]
 
         # anchors are divided by the stride (anchors_for_head_1/8, anchors_for_head_1/16 etc.)
-        anchors_ = torch.tensor(anchors).float().view(self.nl, -1, 2)
+        anchors_ = anchors.clone().detach().float().view(self.nl, -1, 2)
         anchors_ /= torch.tensor(self.stride).repeat(6, 1).T.reshape(3, 3, 2)
         # print("################anchors##################", anchors_) # NOTE: for test and will be deleted
         self.register_buffer('anchors', anchors_)

@@ -75,7 +75,7 @@ class SegmentationTester:
         last = 0
         picks = []
         for i,s in enumerate(array):
-            if s - last > 15:
+            if s - last > 5:
                 picks.append(i)
             last = s
         return picks
@@ -87,7 +87,7 @@ class SegmentationTester:
         print(picks)
         if len(picks)>1:
             k = (np.ceil((k)/(max(uniques[picks[0]],uniques[picks[1]-1])))).astype(np.uint8)
-
+            print(picks)
         elif len(picks)==1:
             
             k[k>0]=1
@@ -344,8 +344,8 @@ class SegmentationTester:
 
         S = [8, 16, 32]
         boxes = self.cells_to_bboxes(obj_out, self.anchors, S, to_list=False, is_pred=True)
-        boxes = self.non_max_suppression(boxes, iou_threshold=0.5, threshold=.25, max_detections=300)
-        self.mAP(self.objects_annotations,boxes)
+        boxes = self.non_max_suppression(boxes, iou_threshold=0.5, threshold=.5, max_detections=300)
+        # self.mAP(self.objects_annotations,boxes)
         im = self.plot_image(image[0].permute(1, 2, 0).to("cpu"), boxes[0],self.bdd)
         output_array = output
         out = out[:,:,:,:].cpu().numpy()
@@ -374,10 +374,10 @@ class SegmentationTester:
         # eroded = cv2.erode(drivable_area_mask, None, iterations=3)
 
         img = ((((cv2.resize(drivable_area_mask,(40,40),cv2.INTER_NEAREST))>0.5).astype(np.float32))*img).astype(np.uint8)
-
-        img = self.clusterize(img)
         # plt.imshow(img)
         # plt.show()
+        img = self.clusterize(img)
+
         Feature_masks=self.one_hot_encode(img)
 
         for i in range(Feature_masks.shape[2]):
@@ -400,9 +400,9 @@ class SegmentationTester:
 # Example usage:
 if __name__ == "__main__":
 
-    model_path = '/home/kia/Multi-Task-Network/Saved/24_0.0946743194013834_AurigaNet.pth'
-    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/c3cae07c-b1c025cf.jpg'
-    image_name = 'c3cae07c-b1c025cf.jpg'
+    model_path = '/home/kia/Multi-Task-Network/Saved/9_0.6162817656993866_AurigaNet.pth'
+    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/b4f2a76c-6b0c22e6.jpg'
+    image_name = 'b4f2a76c-6b0c22e6.jpg'
     
     tester = SegmentationTester(model_path, image_path, image_name)
     result = tester.test()

@@ -14,7 +14,7 @@ class Parameters():
 
     train_data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/train/"
     train_label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_train.json'
-    val_data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/"
+    val_data_path = "/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val_test/"
     val_label_path = '/home/kia/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_val.json'
     save_path = '/home/kia/BDD100K/Generated/'
     train_Lane_Mask_path = "/home/kia/BDD100K/Generated/train/Lane_Masks"
@@ -51,6 +51,7 @@ class Parameters():
     feature_size = 4
     grid_x = 40
     grid_y = 40
+    embedding_grid_size = 40
 
     anchors = [
         [[10, 13 ], [16, 30  ], [33, 23  ]],  # P3/8
@@ -83,4 +84,10 @@ class Parameters():
     # Train Parameters
     ##############################################################################
     
-    epoch_number = 25
+    epoch_number = 10
+    lr0_adam = 0.001
+    lr0_sgd = 0.1
+    warmup_epochs = 3
+    warmup_bias_lr = 0.01
+    warmup_momentum = 0.8
+    momentum = 0.937

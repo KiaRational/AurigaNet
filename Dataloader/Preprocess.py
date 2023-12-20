@@ -34,18 +34,18 @@ class CustomDataLoader:
         self.transform = transform
 
         if self.transform :
+            # CoarseDropout is not defined for object => what does it do?
             self.transforms = A.Compose(transforms=[
                                                 RandomShadow(prob=0.50),
                                                 A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, p=0.5),
                                                 A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, p=0.5),
                                                 A.GaussNoise(var_limit=(0, 255), p=0.1),
                                                 A.MotionBlur(blur_limit=17, p=0.1),
-                                                A.CoarseDropout(max_holes=6, max_height=32, max_width=32, p=0.1),
                                                 A.ImageCompression(quality_lower=39, quality_upper=60, p=0.2),
                                                 A.HorizontalFlip(p=0.2),
                                                 A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.075, rotate_limit=20, p=0.2,border_mode=cv2.BORDER_CONSTANT)
-                                                ])
-                                            
+                                                ], bbox_params=A.BboxParams(format='yolo', label_fields=['category_ids']))
+
 
     def load_data(self):
         json_file_path = os.path.join(self.label_path)
@@ -92,11 +92,22 @@ class CustomDataLoader:
         lane_clustered_mask = cv2.cvtColor(lane_clustered_mask, cv2.COLOR_BGR2GRAY)
         drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
 
+        object_annotations = self.create_masks(annotation, False)
+        bboxes = []
+        class_ids = []
+        for object_annot in object_annotations:
+            
+            bboxes.append(object_annot[2:6])
+            class_ids.append(object_annot[1])
+
         if self.transform:
+                
+            masks = [drivable_clustered_mask, lane_clustered_mask]
 
-            masks = [drivable_clustered_mask,lane_clustered_mask]
-
-            augmented = self.transforms(image=image,masks=masks)
+            augmented = self.transforms(image        = image,
+                                        masks        = masks,
+                                        bboxes       = bboxes,
+                                        category_ids = class_ids)
 
             image = augmented['image']
 
@@ -104,11 +115,18 @@ class CustomDataLoader:
 
             lane_clustered_mask = augmented['masks'][1]
 
+            bboxes = augmented['bboxes']
+            category_ids = augmented['category_ids']
+
+            for i in range(len(bboxes)): # TODO: check reassign augmented formatted box and class id
+
+                object_annotations[i,2:6] = torch.tensor(list(bboxes[i]))
+                object_annotations[i,1]   = category_ids[i]
+
         lane_clustered_mask = self.clusterize(lane_clustered_mask)
         drivable_clustered_mask = self.clusterize(drivable_clustered_mask)
 
 
-        object_annotations = []
         # Resize and normalize the image
         image = self.resize_image(image)
         image = self.normalize_image(image)
@@ -121,14 +139,13 @@ class CustomDataLoader:
 
         drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
         # Convert cluster masks to instance masks using embedding feature
-        instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 
-
-        object_annotations = self.create_masks(annotation,False)
+        # instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 
+        # instance_drivable = torch.zeros((1,1600,1600))
 
         # Return processed image, cluster masks, and instance masks
 
         
-        return image  , cluster_mask , instance_drivable , object_annotations 
+        return image  , cluster_mask , drivable_clustered_mask_pooled , object_annotations 
 
     def create_masks(self, annotation , CreateMasks = True ) :
         lane_clustered = np.zeros((720, 1280))
@@ -178,10 +195,13 @@ class CustomDataLoader:
                 box_width = x2 - x1
                 box_height = y2 - y1
 
-                xc, yc, wb, hb = self.format_yolo(
-                    [box_center_x, box_center_y, box_width, box_height])
+                #filter boxes smaller than 5px 
+                if box_width*box_height >= 5:
 
-                obj_annot.append(np.array([0 , class_index, xc, yc, wb, hb]))
+                    xc, yc, wb, hb = self.format_yolo(
+                        [box_center_x, box_center_y, box_width, box_height])
+
+                    obj_annot.append(np.array([0 , class_index, xc, yc, wb, hb]))
 
         if CreateMasks:
 
@@ -194,7 +214,7 @@ class CustomDataLoader:
 
         xc, yc, wb, hb = box[0]/(640), box[1]/640, box[2]/640, box[3]/640
         
-        return xc, yc, wb, hb
+        return [xc, yc, wb, hb]
 
     def local_picks(self,array):
         last = 0
@@ -209,6 +229,7 @@ class CustomDataLoader:
         uniques = np.unique(k)
         picks = self.local_picks(uniques)
         if len(picks)>1:
+
             k = (np.ceil((k)/max(uniques[picks[0]],uniques[picks[1]-1]))).astype(np.uint8)
 
         elif len(picks)==1:
@@ -288,5 +309,22 @@ class CustomDataLoader:
     def normalize_image(self, image):
         return image.astype(np.float32) / 255.0
 
+def cluster_to_embedding_feature(cluster_mask, size , device):
+    batch_size = cluster_mask.shape[0]
+    dimensions = size ** 2
+    ground = torch.zeros((batch_size, 1 , dimensions, dimensions), dtype=torch.int32, device=device)
 
+    for batch in range(batch_size):
+        cluster_mask_temp = cluster_mask[batch,:,:].flatten().to(device)
+        # Create a 2D mask for the same instance condition
+        same_instance_mask = (cluster_mask_temp.unsqueeze(1) == cluster_mask_temp)
 
+        # Create a 2D mask for different instance, same class condition
+        diff_instance_same_class_mask = ~same_instance_mask & (cluster_mask_temp.unsqueeze(1) != 0)
+
+        # Assign values based on conditions
+        ground[batch][0][same_instance_mask] = 1  # same instance
+        ground[batch][0][diff_instance_same_class_mask] = 2  # different instance, same class
+        ground[batch][0][cluster_mask_temp == 0] = 3  # different instance, different class
+
+    return ground

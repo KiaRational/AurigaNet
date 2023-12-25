@@ -266,5 +266,4 @@ class Object(nn.Module):
         h1, h2, h3 = self.ObjNeck([x[0], x[1], x[2]])
 
         preds = self.ObjHead([h1, h2, h3])
-
-        return preds
+        return preds   

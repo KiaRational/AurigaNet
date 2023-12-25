@@ -43,6 +43,7 @@ class SegmentationTester:
                     [[30, 61], [62, 45], [59, 119]],  # P4/16
                     [[116, 90], [156, 198], [373, 326]] # P5/32
                 ])
+        self.anchors = torch.tensor(self.anchors).float().view(3, -1, 2) / torch.tensor([8,16,32]).repeat(6, 1).T.reshape(3, 3, 2)
         self.transforms = transforms.Compose([
             transforms.ToTensor()
         ])
@@ -173,7 +174,7 @@ class SegmentationTester:
             scale_bboxes = torch.cat((best_class, obj, xy, wh), dim=-1).reshape(bs, -1, 6)
 
             all_bboxes.append(scale_bboxes)
-
+        print(all_bboxes)
         return torch.cat(all_bboxes, dim=1).tolist() if to_list else torch.cat(all_bboxes, dim=1)
 
     def make_grids(self,anchors, naxs, stride, nx=20, ny=20, i=0):
@@ -400,9 +401,9 @@ class SegmentationTester:
 # Example usage:
 if __name__ == "__main__":
 
-    model_path = '/home/kia/Multi-Task-Network/Saved/9_0.6162817656993866_AurigaNet.pth'
-    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/b4f2a76c-6b0c22e6.jpg'
-    image_name = 'b4f2a76c-6b0c22e6.jpg'
+    model_path = '/home/kia/Multi-Task-Network/Saved/14_0.29910428047180176_AurigaNet.pth'
+    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/b1e1a7b8-a7426a97.jpg'
+    image_name = 'b1e1a7b8-a7426a97.jpg'
     
     tester = SegmentationTester(model_path, image_path, image_name)
     result = tester.test()

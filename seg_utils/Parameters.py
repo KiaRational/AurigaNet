@@ -43,7 +43,18 @@ class Parameters():
         'traffic light': 8,
         'traffic sign': 9
     }
-
+    bdd = [
+        'car' ,
+        'rider' ,
+        'pedestrian' ,
+        'truck' ,
+        'bus' ,
+        'train' ,
+        'motorcycle' ,
+        'bicycle' ,
+        'traffic light' ,
+        'traffic sign' 
+        ]
     ##############################################################################
     # Model Parameters
     ##############################################################################
@@ -58,6 +69,8 @@ class Parameters():
         [[30, 61 ], [62, 45  ], [59, 119 ]],  # P4/16
         [[116, 90], [156, 198], [373, 326]]  # P5/32
     ]
+
+    strides = [8, 16, 32]
     # anchors = [[10,13, 16,30, 33,23],  # P3/8
     #           [30,61, 62,45, 59,119],  # P4/16
     #           [116,90, 156,198, 373,326]] # P5/32
@@ -65,12 +78,13 @@ class Parameters():
     ##############################################################################
     # Loss Functions Parameters
     ##############################################################################
+    image_size = 640
 
     K1 = 1.00
     Alpha1 = 0.75
     Alpha2 = 0.25
     Alpha3 = 1.0
-    
+    Alpha4 = 1.0
     box = 0.05  # box loss gain
     clss = 0.5  # cls loss gain
     cls_pw = 1.0  # cls BCELoss positive_weight
@@ -84,7 +98,7 @@ class Parameters():
     # Train Parameters
     ##############################################################################
     
-    epoch_number = 10
+    epoch_number = 15
     lr0_adam = 0.001
     lr0_sgd = 0.1
     warmup_epochs = 3

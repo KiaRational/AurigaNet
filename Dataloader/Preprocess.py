@@ -200,7 +200,7 @@ class CustomDataLoader:
 
                     xc, yc, wb, hb = self.format_yolo(
                         [box_center_x, box_center_y, box_width, box_height])
-
+                    
                     obj_annot.append(np.array([0 , class_index, xc, yc, wb, hb]))
 
         if CreateMasks:

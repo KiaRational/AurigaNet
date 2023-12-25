@@ -22,6 +22,8 @@ class LabelGenerator(Dataset):
 
         self.check_disk_space(self.save_dir , self.data_loader.num_samples )
 
+        self.ultra = False
+
     def calculate_disk_space(self, num_samples):
         # Size calculation for image, cluster_mask, and instance_mask
         image_size = np.array((3, 640, 640)).nbytes  # Size of float32 data in bytes
@@ -55,9 +57,21 @@ class LabelGenerator(Dataset):
         image = image.transpose((2, 0, 1))
         image = torch.tensor(image)
         confidence_mask = torch.tensor(confidence_mask)
-        return image, [confidence_mask , torch.from_numpy(drivable_clustered_mask_pooled) , objects_annotations]
+        if not self.ultra :
+
+            return image, confidence_mask , torch.from_numpy(drivable_clustered_mask_pooled) , objects_annotations
+
+        else:
+            return image, [confidence_mask , torch.from_numpy(drivable_clustered_mask_pooled) , objects_annotations]
 
     def collate_fn(batch):
+
+        image, confidence_masks , drivable_clustered_masks_pooled , object_annotations = zip(*batch)
+
+        return torch.stack(image, 0), torch.stack(confidence_masks,0) , torch.stack(drivable_clustered_masks_pooled,0) , object_annotations
+
+
+    def collate_fn_ultra(batch):
         image, label= zip(*batch)
         label_det, label_seg, label_inst = [], [], []
         for i , (confidence_mask , drivable_clustered_mask_pooled , objects_annotations) in enumerate(label):

@@ -21,8 +21,35 @@ sys.path.append(project_root)
 from   Models.MultiNet import MultiNet
 import seg_utils.Parameters as Parameters
 
+def iou_width_height_anch(gt_box, anchors, strided_anchors=True, stride=[8, 16, 32]):
+    """
+    Parameters:
+        gt_box (tensor): width and height of the ground truth box
+        anchors (tensor): lists of anchors containing width and height
+        strided_anchors (bool): if the anchors are divided by the stride or not
+    Returns:
+        tensor: Intersection over union between the gt_box and each of the n-anchors
+    """
+    # boxes 1 (gt_box): shape (2,)
+    # boxes 2 (anchors): shape (9,2)
+    # intersection shape: (9,)
+    anchors /= 640
+    if strided_anchors:
+
+        anchors = anchors.reshape(9, 2) * torch.tensor(stride).repeat(6, 1).T.reshape(9, 2)
+
+    intersection = torch.min(gt_box[..., 0], anchors[..., 0]) * torch.min(
+        gt_box[..., 1], anchors[..., 1]
+    )
+    union = (
+        gt_box[..., 0] * gt_box[..., 1] + anchors[..., 0] * anchors[..., 1] - intersection
+    )
+    # intersection/union shape (9,)
+    return intersection / union
+
 
 def iou_width_height(box1, box2):
+
     """
     Calculate Intersection over Union (IoU) between two bounding boxes.
 
@@ -98,7 +125,7 @@ def cells_to_bboxes(predictions, anchors, strides, is_pred=False, to_list=True):
     anchors = anchors.to("cuda")
     all_bboxes = []
     for i in range(num_out_layers):
-        bs, naxs, ny, nx, _ = predictions[i].shape
+        bs,naxs, ny, nx, _ = predictions[i].shape
         stride = strides[i]
         grid[i], anchor_grid[i] = make_grids(anchors, naxs, ny=ny, nx=nx, stride=stride, i=i)
         if is_pred:
@@ -111,16 +138,14 @@ def cells_to_bboxes(predictions, anchors, strides, is_pred=False, to_list=True):
             best_class = torch.argmax(layer_prediction[..., 5:], dim=-1).unsqueeze(-1)
 
         else:
-            predictions[i] = predictions[i].to(config.DEVICE, non_blocking=True)
+            predictions[i] = predictions[i].to("cuda", non_blocking=True)
             obj = predictions[i][..., 4:5]
-            xy = (predictions[i][..., 0:2] + grid[i]) * stride
+            xy = (predictions[i][..., 0:2] + grid[i].to("cuda")) * stride
             wh = predictions[i][..., 2:4] * stride
             best_class = predictions[i][..., 5:6]
-
         scale_bboxes = torch.cat((best_class, obj, xy, wh), dim=-1).reshape(bs, -1, 6)
 
         all_bboxes.append(scale_bboxes)
-
     return torch.cat(all_bboxes, dim=1).tolist() if to_list else torch.cat(all_bboxes, dim=1)
 
 def make_grids(anchors, naxs, stride, nx=20, ny=20, i=0):
@@ -139,6 +164,7 @@ def make_grids(anchors, naxs, stride, nx=20, ny=20, i=0):
 
 def plot_image(image, boxes, labels):
     """Plots predicted bounding boxes on the image"""
+    plt.clf()
     cmap = plt.get_cmap("tab20b")
     class_labels = labels
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
@@ -188,6 +214,7 @@ def plot_image(image, boxes, labels):
             bbox={"color": colors[int(class_pred)], "pad": 0},
         )
     # plt.show()
+    plt.savefig("/home/kia/Multi-Task-Network/Saved/af.png")
     return im
 
 
@@ -239,8 +266,66 @@ def clip_boxes(boxes, shape):
         boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
 
 
+def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint", GIoU=False, eps=1e-7):
+    """
+    Video explanation of this function:
+    https://youtu.be/XXYG5ZWtjj0
+
+    This function calculates intersection over union (iou) given pred boxes
+    and target boxes.
+
+    Parameters:
+        boxes_preds (tensor): Predictions of Bounding Boxes (BATCH_SIZE, 4)
+        boxes_labels (tensor): Correct labels of Bounding Boxes (BATCH_SIZE, 4)
+        box_format (str): midpoint/corners, if boxes (x,y,w,h) or (x1,y1,x2,y2)
+        GIoU (bool): if True it computed GIoU loss (https://giou.stanford.edu)
+        eps (float): for numerical stability
+
+    Returns:
+        tensor: Intersection over union for all examples
+    """
+
+    if box_format == "midpoint":
+        box1_x1 = boxes_preds[..., 0:1] - boxes_preds[..., 2:3] / 2
+        box1_y1 = boxes_preds[..., 1:2] - boxes_preds[..., 3:4] / 2
+        box1_x2 = boxes_preds[..., 0:1] + boxes_preds[..., 2:3] / 2
+        box1_y2 = boxes_preds[..., 1:2] + boxes_preds[..., 3:4] / 2
+        box2_x1 = boxes_labels[..., 0:1] - boxes_labels[..., 2:3] / 2
+        box2_y1 = boxes_labels[..., 1:2] - boxes_labels[..., 3:4] / 2
+        box2_x2 = boxes_labels[..., 0:1] + boxes_labels[..., 2:3] / 2
+        box2_y2 = boxes_labels[..., 1:2] + boxes_labels[..., 3:4] / 2
+
+    else:  # if not midpoints box coordinates are considered to be in coco format
+        box1_x1 = boxes_preds[..., 0:1]
+        box1_y1 = boxes_preds[..., 1:2]
+        box1_x2 = boxes_preds[..., 2:3]
+        box1_y2 = boxes_preds[..., 3:4]
+        box2_x1 = boxes_labels[..., 0:1]
+        box2_y1 = boxes_labels[..., 1:2]
+        box2_x2 = boxes_labels[..., 2:3]
+        box2_y2 = boxes_labels[..., 3:4]
+
+    w1, h1, w2, h2 = box1_x2 - box1_x1, box1_y2 - box1_y1, box2_x2 - box2_x1, box2_y2 - box2_y1
+    # Intersection area
+    inter = (torch.min(box1_x2, box2_x2) - torch.max(box1_x1, box2_x1)).clamp(0) * \
+            (torch.min(box1_y2, box2_y2) - torch.max(box1_y1, box2_y1)).clamp(0)
+
+    # Union Area
+    union = w1 * h1 + w2 * h2 - inter + eps
+
+    iou = inter / union
+
+    if GIoU:
+        cw = torch.max(box1_x2, box2_x2) - torch.min(box1_x1, box2_x1)  # convex (smallest enclosing box) width
+        ch = torch.max(box1_y2, box2_y2) - torch.min(box1_y1, box2_y1)
+        c_area = cw * ch + eps  # convex height
+        return iou - (c_area - union) / c_area  # GIoU https://arxiv.org/pdf/1902.09630.pdf
+    return iou  # IoU
 
 def mAP(label, pred, class_num=10):
+    print(label.shape, pred.shape)
+    correct_class = 0
+    correct_obj = 0
     # Convert label and pred to numpy arrays
     pred =pred.cpu().numpy()
     label_boxes = label[..., 2:] * 640
@@ -258,17 +343,22 @@ def mAP(label, pred, class_num=10):
     np.set_printoptions(suppress=True)
 
     # Initialize TPFP50 and TPFP75 arrays
+
     TPFP50 = np.zeros((class_num, 2))  # |FP|TP|
     TPFP75 = np.zeros((class_num, 2))
-
+    CONFMTX = np.zeros((class_num+1, class_num+1)) 
+    CONFMTX_Totals = np.zeros((class_num+1, class_num+1))
     # Count occurrences of predicted classes
     counter = Counter(pred_classes)
     pred_counts = list(counter.items())
-
     for pred_count in pred_counts:
         TPFP50[int(pred_count[0]), 0] = int(pred_count[1])
         TPFP75[int(pred_count[0]), 0] = int(pred_count[1])
 
+    tot_class , tot_obj = len(label_classes) , len(label_boxes)
+
+    for i , box in enumerate(label_classes):
+        CONFMTX_Totals[int(label_classes[i]),:-1] += 1
 
     for i, pred_box in enumerate(pred_boxes):
         ious = [iou_width_height(torch.tensor(pred_box), torch.tensor(label_box))
@@ -277,22 +367,83 @@ def mAP(label, pred, class_num=10):
         index = np.array(ious).argmax()
 
         if ious[index] >= 0.5:
+            correct_obj += 1
             if pred_classes[i] == label_classes[index]:
+                correct_class += 1
+                CONFMTX[int(pred_classes[i]),int(label_classes[index])] += 1
                 TPFP50[int(pred_classes[i]), 1] += 1  # count as TP
                 TPFP50[int(pred_classes[i]), 0] -= 1
                 if ious[index] < 0.75:
                     matches.append((int(pred_classes[i]), i, index, ious[index]))
+            else:
+                CONFMTX[int(pred_classes[i]),int(label_classes[index])] += 1
+        
         else:
             if pred_classes[i] == label_classes[index]:
                 TPFP50[int(pred_classes[i]), 0] += 1  # count as FP
-
+                CONFMTX[int(pred_classes[i]),int(label_classes[index])] += 1
+            else:
+                CONFMTX[int(pred_classes[i]),int(label_classes[index])] += 1
+        
         if ious[index] >= 0.75:
             if pred_classes[i] == label_classes[index]:
                 TPFP75[int(pred_classes[i]), 1] += 1
                 TPFP75[int(pred_classes[i]), 0] -= 1
                 matches.append((int(pred_classes[i]), i, index, ious[index]))
+        
         else:
             if pred_classes[i] == label_classes[index]:
                 TPFP75[int(pred_classes[i]), 0] += 1  # count as FP
-    return TPFP50, TPFP75
 
+    class_acc = (correct_class / (tot_class + 1e-16))
+    obj_acc   = (correct_obj / (tot_obj + 1e-16))
+    CONFMTX = CONFMTX/(CONFMTX_Totals + 1e-16)
+    print(matches)
+    return TPFP50 , TPFP75 , class_acc , obj_acc , CONFMTX
+
+def plot_confusion_matrix(conf_matrix, classes, save_path=None):
+
+    plt.clf()
+    plt.figure(figsize=(10, 10))
+    plt.imshow(conf_matrix, interpolation='nearest', cmap=plt.cm.Blues , vmin= 0)
+    plt.title('Confusion Matrix')
+    plt.colorbar()
+
+    tick_marks = np.arange(len(classes)+1)
+
+    plt.xticks(tick_marks, classes+["no object"], rotation=45)
+    plt.yticks(tick_marks, classes+ ["not detected"])
+    plt.ylabel('Actual label')
+    plt.xlabel('Predicted label')
+
+    for i in range(len(classes)+1):
+        for j in range(len(classes)+1):
+            plt.text(j, i, str(conf_matrix[i, j])[:5], ha='center', va='center', color='red', fontsize=10)
+
+    if save_path:
+        plt.savefig(save_path+"confmtx.png")
+        plt.close()
+        # print(f"Confusion matrix plot saved at {save_path}")
+
+
+
+def check_det_accuracy(y,out,conf_threshold):
+    tot_class_preds, correct_class = 0, 0
+    tot_obj, correct_obj = 0, 0
+
+    for i in range(3):
+        obj = y[i][..., 4] == 1  # in paper this is Iobj_i
+
+        correct_class += torch.sum(
+            torch.argmax(out[i][..., 5:][obj], dim=-1) == y[i][..., 5][obj]
+        )
+        tot_class_preds += torch.sum(obj)
+
+        obj_preds = torch.sigmoid(out[i][..., 0]) > conf_threshold
+        correct_obj += torch.sum(obj_preds[obj] == y[i][..., 4][obj])
+        tot_obj += torch.sum(obj)
+
+    class_accuracy = (correct_class / (tot_class_preds + 1e-16))
+    obj_accuracy = (correct_obj / (tot_obj + 1e-16))
+
+    return class_accuracy,obj_accuracy

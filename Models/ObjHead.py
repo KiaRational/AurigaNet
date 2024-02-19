@@ -157,4 +157,5 @@ class Object(nn.Module):
         Octant_out , One_sixteenth_out , One_thirty_second_out = self.ObjHead(Octant_in , One_sixteenth_in , One_thirty_second_in)
 
         preds = self.ObjDetect([Octant_out , One_sixteenth_out , One_thirty_second_out])
+        
         return preds

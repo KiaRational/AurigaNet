@@ -8,6 +8,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 from seg_utils.Parameters import Parameters
+from Models.utils import *
 
 #######################################################
 
@@ -122,7 +123,7 @@ class ConvBNReLU(nn.Sequential):
         super().__init__(
             nn.Conv2d(in_channels, n_filters, k_size, padding=padding, stride=stride, bias=bias),
             nn.BatchNorm2d(n_filters, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-            nn.ReLU(inplace=True),
+            nn.SiLU(inplace=True),
         )
 
 class DownsampleConv(nn.Sequential):
@@ -139,8 +140,8 @@ class DownsampleConv(nn.Sequential):
         ratio_log2 = int(torch.log2(torch.tensor(downsample_ratio)).item())
         for i in range(ratio_log2):
             temp_channels = in_channels if i == 0 else out_channels
-            self.add_module(f'Conv2d_{i}', ConvBNReLU(in_channels=temp_channels, n_filters=out_channels//2, k_size=3, padding=1, stride=2))
-            self.add_module(f'ConvBNReLU_{i}', ConvBNReLU(in_channels=out_channels//2, n_filters=out_channels, k_size=1, padding=0, stride=1))
+            self.add_module(f'Conv2d_{i}', ConvBNReLU(in_channels=temp_channels, n_filters=out_channels, k_size=3, padding=1, stride=2))
+        self.add_module(f'ConvBNReLU_{0}', ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1))
 
 class BilinearUpsampleConv1x1(nn.Sequential):
     """
@@ -155,10 +156,10 @@ class BilinearUpsampleConv1x1(nn.Sequential):
         super().__init__(
             nn.Conv2d(in_channels, out_channels, 1, padding=0, stride=1)
         )
-        for i in range(int(torch.log2(torch.tensor(upsample_ratio)).item())):
-            self.add_module(f'Upsample_{i}', nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))
-            self.add_module(f'BatchNorm_{i}', nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
-            self.add_module(f'ReLU_{i}', nn.ReLU(inplace=False))
+        # for i in range(int(torch.log2(torch.tensor(upsample_ratio)).item())):
+        self.add_module(f'Upsample_{0}', nn.Upsample(scale_factor=upsample_ratio, mode='bilinear', align_corners=True))
+        self.add_module(f'BatchNorm_{0}', nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
+        self.add_module(f'ReLU_{0}', nn.ReLU(inplace=False))
 
 class UpsampleConvTranspose(nn.Sequential):
     """
@@ -173,8 +174,12 @@ class UpsampleConvTranspose(nn.Sequential):
         super().__init__()
         ratio_log2 = int(torch.log2(torch.tensor(upsample_ratio)).item())
         for i in range(ratio_log2):
-            self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(in_channels, out_channels, 3, 2, 1, 1))
-            self.add_module(f'Conv1x1_{i}', ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1))
+            if i == 0 :
+                self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(in_channels, out_channels, 3, 2, 1, 1))
+            else:
+                self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(out_channels, out_channels, 3, 2, 1, 1))
+
+        self.add_module(f'Conv1x1_{0}', ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1))
 
 class MixedUpsample(nn.Module):
     """
@@ -187,7 +192,7 @@ class MixedUpsample(nn.Module):
     """
     def __init__(self, in_channels, out_channels, upsample_ratio=2):
         super(MixedUpsample, self).__init__()
-        self.upsamplelinear = BilinearUpsampleConv1x1(in_channels, out_channels, upsample_ratio)
+        # self.upsamplelinear = BilinearUpsampleConv1x1(in_channels, out_channels, upsample_ratio)
         self.upsampleconv = UpsampleConvTranspose(in_channels, out_channels, upsample_ratio)
 
     def forward(self, x):
@@ -200,54 +205,67 @@ class MixedUpsample(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        return self.upsampleconv(x) + self.upsamplelinear(x)
 
-class ResidualBottleneckBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1):
-        super(ResidualBottleneckBlock, self).__init__()
-        self.layer1 = ConvBNReLU(in_channels=in_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
-        self.layer2 = ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=kernel_size, padding=padding, stride=stride)
-        self.layer3 = ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
-        self.res_conv = None
-        if in_channels != out_channels:
-            self.res_conv = ConvBNReLU(in_channels=in_channels, n_filters=out_channels, k_size=1, padding=0, stride=1)
-
-    def forward(self, x):
-        res = x if self.res_conv is None else self.res_conv(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-
-        return x + res
-
-class BasicBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, repeat_num = 2):
-        super(BasicBlock, self).__init__()
-        self.layers = nn.ModuleList()
-        for i in range(repeat_num):
-            if i == 0:
-                self.layers.append(ResidualBottleneckBlock(in_channels, out_channels, kernel_size, padding, stride))
-            else:
-                self.layers.append(ResidualBottleneckBlock(out_channels, out_channels, kernel_size, padding, stride))
-
-    def forward(self, x):
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-
-class Output(nn.Module):
+        # return torch.add(self.upsampleconv(x) , self.upsamplelinear(x))
+        return self.upsampleconv(x)
+class Output(nn.Sequential):
     def __init__(self, in_channels, out_channels):
-        super(Output, self).__init__()
-        self.conv1 = ConvBNReLU(in_channels, in_channels//4, 3, 1, 1)
-        self.conv2 = ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1)
-        self.conv3 = nn.Conv2d(in_channels//8, out_channels, kernel_size=1, padding=0, stride=1, bias=False)
+        super(Output, self).__init__(
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        return x
+        ConvBNReLU(in_channels, in_channels//4, 3, 1, 1),
+        ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1),
+        nn.Conv2d(in_channels//8, out_channels, kernel_size=1, padding=0, stride=1, bias=False),
+        )
+
+class LaneSegHead(nn.Module):
+    def __init__(self, out_channels_list ,w,r,d ):
+        super(LaneSegHead,self).__init__()
+        
+        self.MixUpsample_1 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.c2f_1 = C2f(in_channels = int(1.5*out_channels_list[2]//w ), out_channels= int(1.5*out_channels_list[2]//w ))
+        self.MixUpsample_2 = MixedUpsample(in_channels = int(1.5*out_channels_list[2]//w ) , out_channels = int(1.5*out_channels_list[2]//w ))
+        self.c2f_2 = C2f(in_channels =int(1.5*out_channels_list[2]//w ) , out_channels= out_channels_list[2]//w)
+        self.MixUpsample_3 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.out =   Output(out_channels_list[2]//w , 1 )
+
+
+    def forward(self,Quarter,Octant):
+        x = self.c2f_1(torch.cat((self.MixUpsample_1(Octant),Quarter),1))
+        x = self.c2f_2(self.MixUpsample_2(x))
+
+        return self.out(x)
+
+class Area_FE_Head(nn.Module):
+    def __init__(self, out_channels_list, w,r,d , out_fe):
+        super(Area_FE_Head,self).__init__()
+
+        self.MixUpsample_1 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.c2f_1_d = C2f(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w)
+        self.MixUpsample_2 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.c2f_2_d = C2f(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w)
+        self.MixUpsample_3 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+
+        self.c2f_1_f = C2f(in_channels =3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w)
+        # self.c2f_2_f = C2f(in_channels = 2*out_channels_list[2]//w , out_channels= 2*out_channels_list[2]//w)
+        # self.c2f_3_f = C2f(in_channels = 3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w)
+
+        self.DownsampleConv_1 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w,downsample_ratio=2)
+        # self.DownsampleConv_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w,downsample_ratio=4)
+        # self.DownsampleConv_3 = DownsampleConv(in_channels = 3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w,downsample_ratio=2)
+
+        self.out_d =   Output(out_channels_list[2]//w , 1 )
+        self.out_f =   Output(3*out_channels_list[2]//w, out_fe)
+
+    
+    def forward(self,Octant):
+        out_d = self.c2f_1_d(self.MixUpsample_1(Octant))
+        out_f = self.c2f_1_f(self.DownsampleConv_1(out_d))
+        out_d = self.c2f_2_d(self.MixUpsample_2(out_d))
+        # out_f = self.out_f(self.DownsampleConv_3(self.c2f_3_f(torch.cat((out_f,self.DownsampleConv_2(out_d)),1))))
+        out_d = self.out_d(out_d)
+        out_f = self.out_f(out_f)
+
+        return [out_d,out_f]
 
 
 class SegHead(nn.Module):
@@ -255,105 +273,13 @@ class SegHead(nn.Module):
         super(SegHead,self).__init__()
 
         self.p = Parameters()
-        # BasicBlockB_S B is number of branch and S is number of stage
-        self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w)
-        self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w)
-        self.BasicBlock2_1 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.BasicBlock3_2 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w)
-        self.BasicBlock4_3 = BasicBlock(in_channels = out_channels_list[0]//w , out_channels = out_channels_list[0]*r//w,repeat_num=5)
-        self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//(w*r))
-        self.Downsample1_1_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
-        self.Downsample1_2_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
-        self.Downsample1_2_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[3]//w , downsample_ratio=4)
-        self.Downsample2_2_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
-        self.Downsample1_3_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=4)
-        self.Downsample2_3_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
-        self.Upsample2_1_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
-        self.Upsample2_2_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
-        self.Upsample3_2_4 = BilinearUpsampleConv1x1(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[1]//w , upsample_ratio=4)
-        self.Upsample3_2_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[2]//w , upsample_ratio=2)
 
-        self.Upsample1_3_2 = BilinearUpsampleConv1x1(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
-        self.Upsample2_3_4= BilinearUpsampleConv1x1(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w , upsample_ratio=4)
-        self.Upsample3_3_8 = BilinearUpsampleConv1x1(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=8)     
-
-        self.mixUpsample1_3_2 = MixedUpsample(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
-        self.mixUpsample2_3_4= MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w , upsample_ratio=4)
-        self.mixUpsample3_3_8 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=8)
-
-
-
-        self.relu = nn.ReLU(inplace=False)
-
-        self.Output_Confidence_Lane  = Output(in_channels=256, out_channels= 1 )
-        self.Output_Confidence_Area  = Output(in_channels=256, out_channels= 1 )  
-
-        self.Output_EmbeddingFeatureArea   = Output(in_channels=256, out_channels = self.p.feature_size)
-
-    def forward(self, Half,Quarter,Octant,One_sixteenth):
-
-        # -----------------------Stage 1------------------------
-
-        Branch1 =      self.BasicBlock1_1(self.relu(Quarter))
-
-        Branch2 =      self.BasicBlock2_1(self.relu(Octant))
-
-        Branch1_1_2 = self.Downsample1_1_2(Branch1)
-        Branch2_1_2 = self.Upsample2_1_2(Branch2)
-
-        Branch1 = Branch1 + Branch2_1_2
-
-        Branch2 = Branch2 + Branch1_1_2
-
-        # -----------------------Stage 2------------------------
-
-        Branch1 = self.BasicBlock1_2(Branch1)
-        Branch2 = self.BasicBlock2_2(Branch2)
-        Branch3 = self.BasicBlock3_2(self.relu(One_sixteenth))
-
-        Branch1_2_2 = self.Downsample1_2_2(Branch1)
-        Branch1_2_4 = self.Downsample1_2_4(Branch1)
-        BranchD2_2_2 = self.Downsample2_2_2(Branch2)
-        BranchU2_2_2 = self.Upsample2_2_2(Branch2)
-        Branch3_2_2 = self.Upsample3_2_2(Branch3)
-        Branch3_2_4 = self.Upsample3_2_4(Branch3)
-
-        Branch1 = Branch1 + BranchU2_2_2 + Branch3_2_4
-        Branch2 = Branch2 + Branch1_2_2 + Branch3_2_2
-        Branch3 = Branch3 + Branch1_2_4 + BranchD2_2_2
+        self.lane = LaneSegHead(out_channels_list ,w,r,d )
+        self.area_fe = Area_FE_Head(out_channels_list, w,r,d , self.p.feature_size)
         
-        # ------------------------Mix Stage------------------------
+    def forward(self, Half,Quarter,Octant,One_sixteenth):
+        area_fe_out = self.area_fe(Octant)
+        Out_Confidence = torch.cat((self.lane(Quarter,Octant),area_fe_out[0]),1)
 
-        Branch4 = self.BasicBlock4_3(Half)
-
-        Branch1_i = self.Downsample1_3_4(Branch1)
-
-        Branch2_I = self.Downsample2_3_2(Branch2)
-
-        Branch3_I = self.BasicBlock3_3(Branch3)
-
-        Branch1_a = self.Upsample1_3_2(Branch1)
-        Branch2_a = self.Upsample2_3_4(Branch2)
-        Branch3_a = self.Upsample3_3_8(Branch3)
-
-        Branch1_l = self.mixUpsample1_3_2(Branch1)
-
-        Branch2_l = self.mixUpsample2_3_4(Branch2)
-
-        Branch3_l = self.mixUpsample3_3_8(Branch3)
-
-
-        Out_Confidence_l = torch.cat((Branch1_l,Branch2_l,Branch3_l ,Branch4),dim=1)
-        Out_Confidence_a = torch.cat((Branch1_a,Branch2_a,Branch3_a ,Branch4),dim=1)
-
-        Out_Instance   = torch.cat((Branch1_i,Branch2_I,Branch3_I),dim=1)
-
-        Out_Confidence_lane = self.Output_Confidence_Lane(Out_Confidence_l)
-        Out_Confidence_area = self.Output_Confidence_Area(Out_Confidence_a)
-
-        Out_Confidence = torch.cat((Out_Confidence_area,Out_Confidence_lane),dim=1)
-        Out_EmbeddingFeature_Area   = self.Output_EmbeddingFeatureArea(Out_Instance)
-        return [Out_Confidence, Out_EmbeddingFeature_Area ]  
+        return [Out_Confidence, area_fe_out[1] ]  
 

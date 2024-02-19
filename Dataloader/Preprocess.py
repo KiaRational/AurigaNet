@@ -20,7 +20,7 @@ from seg_utils.Parameters import Parameters
 
 
 class CustomDataLoader:
-    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=False):
+    def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=True):
         self.data_path = data_path
         self.p = Parameters()
         self.image_size = image_size
@@ -90,8 +90,11 @@ class CustomDataLoader:
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         lane_clustered_mask = cv2.cvtColor(lane_clustered_mask, cv2.COLOR_BGR2GRAY)
-        drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
 
+        drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
+        drivable_mask = drivable_clustered_mask>0.1
+        eroded = cv2.erode(drivable_mask.astype(np.float32), None, iterations=6)
+        drivable_clustered_mask_fe = cv2.bitwise_and(drivable_clustered_mask,drivable_clustered_mask,mask=eroded.astype(np.uint8))
         object_annotations = self.create_masks(annotation, False)
         bboxes = []
         class_ids = []
@@ -127,22 +130,20 @@ class CustomDataLoader:
         drivable_clustered_mask = self.clusterize(drivable_clustered_mask)
 
 
+        
         # Resize and normalize the image
         image = self.resize_image(image)
         image = self.normalize_image(image)
 
         # Resize drivable and lane cluster masks
-        lane_clustered_mask = self.resize_mask(lane_clustered_mask)
-        drivable_clustered_mask = self.resize_mask(drivable_clustered_mask)
+        lane_clustered_mask = self.max_pooling_2d(lane_clustered_mask)
+        lane_clustered_mask = self.resize_mask_fe(lane_clustered_mask)
+
+        drivable_clustered_mask = self.resize_mask_fe(drivable_clustered_mask)
+        drivable_clustered_mask_fe = self.resize_mask_fe(drivable_clustered_mask_fe)
 
         cluster_mask = np.stack([drivable_clustered_mask , lane_clustered_mask]) 
-
-        drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask)))
-        # Convert cluster masks to instance masks using embedding feature
-        # instance_drivable = self.cluster_to_embedding_feature(drivable_clustered_mask_pooled,  size=40) 
-        # instance_drivable = torch.zeros((1,1600,1600))
-
-        # Return processed image, cluster masks, and instance masks
+        drivable_clustered_mask_pooled = self.max_pooling_2d(self.max_pooling_2d(drivable_clustered_mask_fe))
 
         
         return image  , cluster_mask , drivable_clustered_mask_pooled , object_annotations 
@@ -183,7 +184,6 @@ class CustomDataLoader:
             if category in self.class_mapping.keys():
 
                 class_index = self.class_mapping[category]
-
                 x1 = int(label_info['box2d']['x1'])/(1280/640)
                 y1 = int(label_info['box2d']['y1'])/(720/640)
                 x2 = int(label_info['box2d']['x2'])/(1280/640)
@@ -196,8 +196,7 @@ class CustomDataLoader:
                 box_height = y2 - y1
 
                 #filter boxes smaller than 5px 
-                if box_width*box_height >= 5:
-
+                if box_width*box_height >= 10:
                     xc, yc, wb, hb = self.format_yolo(
                         [box_center_x, box_center_y, box_width, box_height])
                     
@@ -300,7 +299,10 @@ class CustomDataLoader:
     def resize_image(self, image):
         return cv2.resize(image, self.image_size)
 
-    def resize_mask(self, mask):
+    def resize_mask(self, mask,size):
+        return cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST)
+
+    def resize_mask_fe(self, mask):
         return cv2.resize(mask, (self.image_size[0]//2,self.image_size[1]//2), interpolation=cv2.INTER_NEAREST)
 
     def resize_obj_mask(self, obj_mask):

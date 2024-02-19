@@ -9,6 +9,102 @@ sys.path.append(project_root)
 
 from seg_utils.Parameters import Parameters
 
+#######################################################
+
+class BasicConv(nn.Module):
+    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True, bias=False):
+        super(BasicConv, self).__init__()
+        self.out_channels = out_planes
+        self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
+        self.bn = nn.BatchNorm2d(out_planes,eps=1e-5, momentum=0.01, affine=True) if bn else None
+        self.relu = nn.ReLU() if relu else None
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.relu is not None:
+            x = self.relu(x)
+        return x
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+class ChannelGate(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max']):
+        super(ChannelGate, self).__init__()
+        self.gate_channels = gate_channels
+        self.mlp = nn.Sequential(
+            Flatten(),
+            nn.Linear(gate_channels, gate_channels // reduction_ratio),
+            nn.ReLU(),
+            nn.Linear(gate_channels // reduction_ratio, gate_channels)
+            )
+        self.pool_types = pool_types
+    def forward(self, x):
+        channel_att_sum = None
+        for pool_type in self.pool_types:
+            if pool_type=='avg':
+                avg_pool = F.avg_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                channel_att_raw = self.mlp( avg_pool )
+            elif pool_type=='max':
+                max_pool = F.max_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                channel_att_raw = self.mlp( max_pool )
+            elif pool_type=='lp':
+                lp_pool = F.lp_pool2d( x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                channel_att_raw = self.mlp( lp_pool )
+            elif pool_type=='lse':
+                # LSE pool only
+                lse_pool = logsumexp_2d(x)
+                channel_att_raw = self.mlp( lse_pool )
+
+            if channel_att_sum is None:
+                channel_att_sum = channel_att_raw
+            else:
+                channel_att_sum = channel_att_sum + channel_att_raw
+
+        scale = F.sigmoid( channel_att_sum ).unsqueeze(2).unsqueeze(3).expand_as(x)
+        return x * scale
+
+def logsumexp_2d(tensor):
+    tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
+    s, _ = torch.max(tensor_flatten, dim=2, keepdim=True)
+    outputs = s + (tensor_flatten - s).exp().sum(dim=2, keepdim=True).log()
+    return outputs
+
+class ChannelPool(nn.Module):
+    def forward(self, x):
+        return torch.cat( (torch.max(x,1)[0].unsqueeze(1), torch.mean(x,1).unsqueeze(1)), dim=1 )
+
+class SpatialGate(nn.Module):
+    def __init__(self):
+        super(SpatialGate, self).__init__()
+        kernel_size = 7
+        self.compress = ChannelPool()
+        self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size-1) // 2, relu=False)
+    def forward(self, x):
+        x_compress = self.compress(x)
+        x_out = self.spatial(x_compress)
+        scale = F.sigmoid(x_out) # broadcasting
+        return x * scale
+
+class CBAM(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
+        super(CBAM, self).__init__()
+        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
+        self.no_spatial=no_spatial
+        if not no_spatial:
+            self.SpatialGate = SpatialGate()
+    def forward(self, x):
+        x_out = self.ChannelGate(x)
+        if not self.no_spatial:
+            x_out = self.SpatialGate(x_out)
+        return x_out
+
+
+#######################################################
+
 
 class ConvBNReLU(nn.Sequential):
     """
@@ -22,13 +118,12 @@ class ConvBNReLU(nn.Sequential):
         stride (int): Stride used for the convolution operation.
         bias (bool, optional): Whether to include bias in the convolutional layer. Default is True.
     """
-    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=True):
+    def __init__(self, in_channels, n_filters, k_size, padding, stride, bias=False):
         super().__init__(
             nn.Conv2d(in_channels, n_filters, k_size, padding=padding, stride=stride, bias=bias),
             nn.BatchNorm2d(n_filters, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
         )
-
 
 class DownsampleConv(nn.Sequential):
     """
@@ -60,10 +155,10 @@ class BilinearUpsampleConv1x1(nn.Sequential):
         super().__init__(
             nn.Conv2d(in_channels, out_channels, 1, padding=0, stride=1)
         )
-        for i in range(int(torch.log2(torch.tensor(upsample_ratio)).item())):
-            self.add_module(f'Upsample_{i}', nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))
-            self.add_module(f'BatchNorm_{i}', nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
-            self.add_module(f'ReLU_{i}', nn.ReLU(inplace=False))
+        # for i in range(int(torch.log2(torch.tensor(upsample_ratio)).item())):
+        self.add_module(f'Upsample_{0}', nn.Upsample(scale_factor=upsample_ratio, mode='bilinear', align_corners=True))
+        self.add_module(f'BatchNorm_{0}', nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
+        self.add_module(f'ReLU_{0}', nn.ReLU(inplace=False))
 
 class UpsampleConvTranspose(nn.Sequential):
     """
@@ -78,8 +173,12 @@ class UpsampleConvTranspose(nn.Sequential):
         super().__init__()
         ratio_log2 = int(torch.log2(torch.tensor(upsample_ratio)).item())
         for i in range(ratio_log2):
-            self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(in_channels, out_channels, 3, 2, 1, 1))
-            self.add_module(f'Conv1x1_{i}', ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1))
+            if i == 0 :
+                self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(in_channels, out_channels, 3, 2, 1, 1))
+            else:
+                self.add_module(f'ConvTranspose2d_{i}', nn.ConvTranspose2d(out_channels, out_channels, 3, 2, 1, 1))
+
+        self.add_module(f'Conv1x1_{0}', ConvBNReLU(in_channels=out_channels, n_filters=out_channels, k_size=1, padding=0, stride=1))
 
 class MixedUpsample(nn.Module):
     """
@@ -92,7 +191,7 @@ class MixedUpsample(nn.Module):
     """
     def __init__(self, in_channels, out_channels, upsample_ratio=2):
         super(MixedUpsample, self).__init__()
-        self.upsamplelinear = BilinearUpsampleConv1x1(in_channels, out_channels, upsample_ratio)
+        # self.upsamplelinear = BilinearUpsampleConv1x1(in_channels, out_channels, upsample_ratio)
         self.upsampleconv = UpsampleConvTranspose(in_channels, out_channels, upsample_ratio)
 
     def forward(self, x):
@@ -105,7 +204,7 @@ class MixedUpsample(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        return self.upsampleconv(x) + self.upsamplelinear(x)
+        return self.upsampleconv(x) #+ self.upsamplelinear(x)
 
 class ResidualBottleneckBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1):
@@ -126,7 +225,7 @@ class ResidualBottleneckBlock(nn.Module):
         return x + res
 
 class BasicBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, repeat_num = 4):
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, repeat_num = 2):
         super(BasicBlock, self).__init__()
         self.layers = nn.ModuleList()
         for i in range(repeat_num):
@@ -146,7 +245,7 @@ class Output(nn.Module):
         super(Output, self).__init__()
         self.conv1 = ConvBNReLU(in_channels, in_channels//4, 3, 1, 1)
         self.conv2 = ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1)
-        self.conv3 = ConvBNReLU(in_channels//8, out_channels, 1, 0, 1)
+        self.conv3 = nn.Conv2d(in_channels//8, out_channels, kernel_size=1, padding=0, stride=1, bias=False)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -154,163 +253,111 @@ class Output(nn.Module):
         x = self.conv3(x)
         return x
 
-class FusionLayer(nn.Module):
-    """
-    A module for performing feature fusion across multiple branches.
 
-    Args:
-        in_branches (int): Number of input branches.
-        out_branches (int): Number of output branches.
-        c (int): Number of channels in the convolutional layers.
-    """
-    def __init__(self, in_branches , out_branches, c):
-        super(FusionLayer, self).__init__()
-
-        self.out_branches = out_branches
-        self.in_branches = in_branches
-        self.fuse_layers = nn.ModuleList()
-        # for each output_branches (i.e. each branch in all cases but the very last one)
-        for i in range(self.out_branches):
-            self.fuse_layers.append(nn.ModuleList())
-            for j in range(self.in_branches):  # for each branch
-                if i == j:
-                    self.fuse_layers[-1].append(nn.Sequential())  # Used in place of "None" because it is callable
-                elif i < j:
-                    self.fuse_layers[-1].append(nn.Sequential(
-                        nn.Conv2d(c * (2 ** j), c * (2 ** i), kernel_size=(1, 1), stride=(1, 1), bias=False),
-                        nn.BatchNorm2d(c * (2 ** i), eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                        nn.Upsample(scale_factor=(2.0 ** (j - i)), mode='nearest'),
-                    ))
-                elif i > j:
-                    ops = []
-                    for k in range(i - j - 1):
-                        ops.append(nn.Sequential(
-                            nn.Conv2d(c * (2 ** j), c * (2 ** j), kernel_size=(3, 3), stride=(2, 2), padding=(1, 1),
-                                      bias=False),
-                            nn.BatchNorm2d(c * (2 ** j), eps=1e-05, momentum=0.1, affine=True,
-                                           track_running_stats=True),
-                            nn.ReLU(inplace=False),
-                        ))
-                    ops.append(nn.Sequential(
-                        nn.Conv2d(c * (2 ** j), c * (2 ** i), kernel_size=(3, 3), stride=(2, 2), padding=(1, 1),
-                                  bias=False),
-                        nn.BatchNorm2d(c * (2 ** i), eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    ))
-                    self.fuse_layers[-1].append(nn.Sequential(*ops))
-
-        self.relu = nn.ReLU(inplace=False)
-
-
-    def forward(self, branches):
-        assert len(self.fuse_layers) == len(branches)
-
-        x_fused = []
-        for i in range(len(self.fuse_layers)):
-            for j in range(0, len(branches)):
-                if j == 0:
-                    x_fused.append(self.fuse_layers[i][0](branches[0]))
-
-                else:
-                    # print(self.fuse_layers[i][j](branches[j]).shape,x_fused[i].shape)
-                    x_fused[i] = x_fused[i] + self.fuse_layers[i][j](branches[j]).clone()
-
-
-        for i in range(len(x_fused)):
-            x_fused[i] = self.relu(x_fused[i].clone())
-
-        return x_fused
-
-class SegNeck(nn.Module):
-    """
-    A segmentation network neck module.
-
-    Args:
-        Resize (int, optional): The factor by which the feature maps are resized. Default is 1.
-    """
-
-    def __init__(self, out_channels_list , class_number):
-        super(SegNeck,self).__init__()
+class SegHead(nn.Module):
+    def __init__(self, out_channels_list ,w,r,d , class_number):
+        super(SegHead,self).__init__()
 
         self.p = Parameters()
         # BasicBlockB_S B is number of branch and S is number of stage
-        self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-        self.BasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-        self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-        self.BasicBlock1_3 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-        self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-        self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-        self.BasicBlock2_4 = BasicBlock(in_channels = out_channels_list[1] , out_channels = out_channels_list[1])
-        self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
-        self.BasicBlock3_4 = BasicBlock(in_channels = out_channels_list[2] , out_channels = out_channels_list[2])
-        self.BasicBlock4_4 = BasicBlock(in_channels = out_channels_list[3] , out_channels = out_channels_list[3])
-        self.SecondBasicBlock1_4 = BasicBlock(in_channels = out_channels_list[0] , out_channels = out_channels_list[0])
-        self.mixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
-        self.mixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
-        self.mixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
-        
-        self.SecondmixUpsample2_4_2 = MixedUpsample(in_channels = out_channels_list[1] , out_channels = out_channels_list[1] , upsample_ratio=2)
-        self.SecondmixUpsample3_4_4 = MixedUpsample(in_channels = out_channels_list[2] , out_channels = out_channels_list[2] , upsample_ratio=4)
-        self.SecondmixUpsample4_4_8 = MixedUpsample(in_channels = out_channels_list[3] , out_channels = out_channels_list[3] , upsample_ratio=8)
+        # self.BasicBlock1_1 = BasicBlock(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w)
+        self.BasicBlock1_2 = BasicBlock(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w)
+        # self.BasicBlock2_1 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.BasicBlock2_2 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.BasicBlock3_2 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w)
+        self.BasicBlock4_3 = BasicBlock(in_channels = out_channels_list[0]//w , out_channels = out_channels_list[0]*r//w,repeat_num=3)
+        self.BasicBlock2_3 = BasicBlock(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.BasicBlock3_3 = BasicBlock(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//(w*r))
+        self.Downsample1_1_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
+        self.Downsample1_2_2 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=2)
+        self.Downsample1_2_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[3]//w , downsample_ratio=4)
+        self.Downsample2_2_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
+        self.Downsample1_3_4 = DownsampleConv(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[2]//w , downsample_ratio=4)
+        self.Downsample2_3_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[3]//w , downsample_ratio=2)
+        self.Upsample2_1_2 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
+        self.Upsample2_2_2 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
+        self.Upsample3_2_4 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[1]//w , upsample_ratio=4)
+        self.Upsample3_2_2 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[2]//w , upsample_ratio=2)
+
+        self.Upsample1_3_2 = MixedUpsample(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
+        self.Upsample2_3_4= MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w , upsample_ratio=4)
+        self.Upsample3_3_8 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=8)     
+
+        self.mixUpsample1_3_2 = MixedUpsample(in_channels = out_channels_list[1]//w , out_channels = out_channels_list[1]//w , upsample_ratio=2)
+        self.mixUpsample2_3_4= MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w , upsample_ratio=4)
+        self.mixUpsample3_3_8 = MixedUpsample(in_channels = out_channels_list[3]//w , out_channels = out_channels_list[3]//w , upsample_ratio=8)
+
+
 
         self.relu = nn.ReLU(inplace=False)
-        self.Fusing2 = FusionLayer(2,2,out_channels_list[0])
-        self.Fusing3 = FusionLayer(3,3,out_channels_list[0])
-        self.Fusing4 = FusionLayer(4,4,out_channels_list[0])
-        self.Output_Confidence  = Output(in_channels=np.sum(out_channels_list), out_channels= class_number )
-        self.DownOut_Area = DownsampleConv(in_channels=np.sum(out_channels_list),out_channels=np.sum(out_channels_list),downsample_ratio=4)
-        self.Output_EmbeddingFeatureArea   = Output(in_channels=np.sum(out_channels_list), out_channels = self.p.feature_size)
+
+        self.Output_Confidence_Lane  = Output(in_channels=256, out_channels= 1 )
+        self.Output_Confidence_Area  = Output(in_channels=256, out_channels= 1 )  
+
+        self.Output_EmbeddingFeatureArea   = Output(in_channels=256, out_channels = self.p.feature_size)
 
     def forward(self, Half,Quarter,Octant,One_sixteenth):
+
         # -----------------------Stage 1------------------------
 
-        Branch1 =      self.BasicBlock1_1(self.relu(Half))
+        Branch1 =     Quarter# self.BasicBlock1_1(self.relu(Quarter))
 
+        Branch2 =      Octant#self.BasicBlock2_1(self.relu(Octant))
+
+        Branch1_1_2 = self.Downsample1_1_2(Branch1)
+        Branch2_1_2 = self.Upsample2_1_2(Branch2)
+
+        Branch1 = torch.sum(torch.stack([Branch1 , Branch2_1_2]), dim=0)
+
+        Branch2 = torch.sum(torch.stack([Branch2 , Branch1_1_2]), dim=0)
 
         # -----------------------Stage 2------------------------
 
-        Branch2 =      self.BasicBlock2_2(self.relu(Quarter))
+        Branch1 = self.BasicBlock1_2(Branch1)
+        Branch2 = self.BasicBlock2_2(Branch2)
+        Branch3 = self.BasicBlock3_2(self.relu(One_sixteenth))
 
-        Branch1 , Branch2 = self.Fusing2([Branch1,Branch2])
+        Branch1_2_2 = self.Downsample1_2_2(Branch1)
+        Branch1_2_4 = self.Downsample1_2_4(Branch1)
+        BranchD2_2_2 = self.Downsample2_2_2(Branch2)
+        BranchU2_2_2 = self.Upsample2_2_2(Branch2)
+        Branch3_2_2 = self.Upsample3_2_2(Branch3)
+        Branch3_2_4 = self.Upsample3_2_4(Branch3)
 
-
-        # -----------------------Stage 3------------------------
-
-        Branch1 = self.BasicBlock1_3(Branch1)
-        Branch2 = self.BasicBlock2_3(Branch2)
-        Branch3 = self.BasicBlock3_3(self.relu(Octant))
-
-        Branch1 , Branch2 , Branch3 = self.Fusing3([Branch1 , Branch2 , Branch3])
-
-        # -----------------------Stage 4------------------------
-
-        Branch1 = self.BasicBlock1_4(Branch1)
-        Branch2 = self.BasicBlock2_4(Branch2)
-        Branch3 = self.BasicBlock3_4(Branch3)
-        Branch4 = self.BasicBlock4_4(self.relu(One_sixteenth))
-
-        Branch1 , Branch2 , Branch3 , Branch4 = self.Fusing4([Branch1 , Branch2 , Branch3 , Branch4])
-
-        # ------------------------Output------------------------
-
-        Branch1 = self.BasicBlock1_4(Branch1)
-        Branch2_1 = self.mixUpsample2_4_2(Branch2)
-        Branch3_1 = self.mixUpsample3_4_4(Branch3)
-        Branch4_1 = self.mixUpsample4_4_8(Branch4)
+        Branch1 = torch.sum(torch.stack([Branch1 , BranchU2_2_2 , Branch3_2_4]), dim=0)
+        Branch2 = torch.sum(torch.stack([Branch2 , Branch1_2_2 , Branch3_2_2]), dim=0)
+        Branch3 = torch.sum(torch.stack([Branch3 , Branch1_2_4 , BranchD2_2_2]), dim=0)
         
-        SecondBranch1 = self.SecondBasicBlock1_4(Branch1)
-        SecondBranch2_1 = self.SecondmixUpsample2_4_2(Branch2)
-        SecondBranch3_1 = self.SecondmixUpsample3_4_4(Branch3)
-        SecondBranch4_1 = self.SecondmixUpsample4_4_8(Branch4)
+        # ------------------------Mix Stage------------------------
 
-        
-        Out_Confidence = torch.cat((Branch1,Branch2_1,Branch3_1 , Branch4_1),dim=1)
-        Out_Instance   = torch.cat((SecondBranch1,SecondBranch2_1,SecondBranch3_1 , SecondBranch4_1),dim=1)
+        Branch4 = self.BasicBlock4_3(Half)
 
-        Out_Confidence = self.Output_Confidence(Out_Confidence)
+        Branch1_i = self.Downsample1_3_4(Branch1)
 
-        Out_EmbeddingFeatureArea = self.DownOut_Area(Out_Instance)
+        Branch2_I = self.Downsample2_3_2(Branch2)
 
-        Out_EmbeddingFeatureArea   = self.Output_EmbeddingFeatureArea(Out_EmbeddingFeatureArea)
+        Branch3_I = self.BasicBlock3_3(Branch3)
 
-        return [Out_Confidence, Out_EmbeddingFeatureArea ]  
+        Branch1_a = self.Upsample1_3_2(Branch1)
+        Branch2_a = self.Upsample2_3_4(Branch2)
+        Branch3_a = self.Upsample3_3_8(Branch3)
+
+        Branch1_l = self.mixUpsample1_3_2(Branch1)
+
+        Branch2_l = self.mixUpsample2_3_4(Branch2)
+
+        Branch3_l = self.mixUpsample3_3_8(Branch3)
+
+
+        Out_Confidence_l = torch.cat((Branch1_l,Branch2_l,Branch3_l ,Branch4),dim=1)
+        Out_Confidence_a = torch.cat((Branch1_a,Branch2_a,Branch3_a ,Branch4),dim=1)
+
+        Out_Instance   = torch.cat((Branch1_i,Branch2_I,Branch3_I),dim=1)
+
+        Out_Confidence_lane = self.Output_Confidence_Lane(Out_Confidence_l)
+        Out_Confidence_area = self.Output_Confidence_Area(Out_Confidence_a)
+
+        Out_Confidence = torch.cat((Out_Confidence_area,Out_Confidence_lane),dim=1)
+        Out_EmbeddingFeature_Area   = self.Output_EmbeddingFeatureArea(Out_Instance)
+        return [Out_Confidence, Out_EmbeddingFeature_Area ]  
 

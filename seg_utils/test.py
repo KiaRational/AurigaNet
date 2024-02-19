@@ -401,9 +401,9 @@ class SegmentationTester:
 # Example usage:
 if __name__ == "__main__":
 
-    model_path = '/home/kia/Multi-Task-Network/Saved/14_0.29910428047180176_AurigaNet.pth'
-    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/b1e1a7b8-a7426a97.jpg'
-    image_name = 'b1e1a7b8-a7426a97.jpg'
+    model_path = '/home/kia/Multi-Task-Network/Saved/14_0.23993450045585632_AurigaNet.pth'
+    image_path = '/home/kia/BDD100K/bdd100k_images_100k_5/bdd100k/images/100k/val/b3e137e5-fe7ef981.jpg'
+    image_name = 'b3e137e5-fe7ef981.jpg'
     
     tester = SegmentationTester(model_path, image_path, image_name)
     result = tester.test()

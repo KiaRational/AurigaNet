@@ -215,6 +215,9 @@ def plot_image(image, boxes, labels):
         )
     # plt.show()
     plt.savefig("/home/kia/Multi-Task-Network/Saved/af.png")
+    plt.close()
+    plt.clf()
+
     return im
 
 

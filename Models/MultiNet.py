@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import numpy as np
 import os
 import sys 
 import torchinfo
@@ -73,5 +74,15 @@ class MultiNet(nn.Module):
 if __name__ == "__main__":
 
     model = MultiNet()
+    model(torch.randn(1,3,640,640))
     # torchinfo.summary(upsample_conv,(1,512, 20, 20))
-    torchinfo.summary(model, (1, 3, 640, 640))
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    print(params)
+    # torchinfo.summary(model, (1, 3, 640, 640))
+    torch_input = torch.randn(1, 3, 640, 640)
+    torch.onnx.export(model,
+                  torch_input,
+                  'auriganet.onnx',
+                  export_params=True,
+                  opset_version=11)

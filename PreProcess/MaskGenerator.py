@@ -23,7 +23,7 @@ from seg_utils.Parameters import Parameters
 class LabelGenerator(Dataset):
 
     def __init__(self, data_path, label_path, save_dir ,image_size=(720, 1280), normalize=True, class_mapping=None,train=True):
-
+        self.data_path = data_path
         self.data_loader = CustomDataLoader(data_path, label_path, image_size, normalize, class_mapping)
 
         self.image_size = image_size
@@ -76,6 +76,12 @@ class LabelGenerator(Dataset):
         image_name = annotation['name']
 
         drivable_clustered , drivable_cluster_index ,lane_clustered , lane_cluster_index , obj_annot = self.data_loader.create_masks(annotation,CreateMasks=True)
+        
+        # img = cv2.imread(os.path.join(self.data_path,str(image_name)))
+
+        # img = cv2.resize(img,(640,640))
+
+        # cv2.imwrite(os.path.join(self.save_dir,str(image_name)),img)
 
         cv2.imwrite(os.path.join(self.Area_save_dir,str(image_name[:-4])+".png"),(drivable_clustered*(255/(drivable_cluster_index))).astype(np.uint8))
 
@@ -111,7 +117,7 @@ def main():
     train_label_path = P.train_label_path
     val_data_path = P.val_data_path
     val_label_path = P.val_label_path
-    save_path = P.save_path
+    save_path = "/home/kia/resized/"
     class_mapping = P.class_mapping
     epochs = P.epoch_number
 
@@ -120,13 +126,14 @@ def main():
 
     batch_size = 1
 
-    train_data_loader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
+    # train_data_loader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
     val_data_loader = DataLoaderX(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=1)
 
 
-    for i, (run) in enumerate(tqdm(train_data_loader)):
-        
-        continue
+    # for i, (run) in enumerate(tqdm(train_data_loader)):
+
+    #     continue
+
     print("Generating Train Mask Label Done")
 
     for i, (run) in enumerate(tqdm(val_data_loader)):

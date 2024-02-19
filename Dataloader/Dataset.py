@@ -49,20 +49,20 @@ class LabelGenerator(Dataset):
     def __getitem__(self, index):
         shapes = (640, 640), ((1, 1), 0)
         annotation = self.data_loader.annotations[index]
-        print(annotation['name'])
+        # print(annotation['name'])
         image  , cluster_mask , drivable_clustered_mask_pooled  , objects_annotations = self.data_loader.process(annotation)
-
         confidence_mask = (cluster_mask>0).astype(int)
 
         image = image.transpose((2, 0, 1))
         image = torch.tensor(image)
         confidence_mask = torch.tensor(confidence_mask)
+        embedding = torch.from_numpy(drivable_clustered_mask_pooled).unsqueeze(0)
         if not self.ultra :
 
-            return image, confidence_mask , torch.from_numpy(drivable_clustered_mask_pooled) , objects_annotations
+            return image, confidence_mask ,embedding , objects_annotations
 
         else:
-            return image, [confidence_mask , torch.from_numpy(drivable_clustered_mask_pooled) , objects_annotations]
+            return image, [confidence_mask , embedding , objects_annotations]
 
     def collate_fn(batch):
 

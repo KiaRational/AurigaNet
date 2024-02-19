@@ -26,6 +26,82 @@ from seg_utils.utils import non_max_suppression,cells_to_bboxes,iou_width_height
                                                                               
 '''
 
+class DiscriminativeLoss(_Loss):
+    def __init__(self, delta_var=0.5, delta_dist=1.5, norm=2, alpha=1.0, beta=1.0, gamma=0.001,
+                 usegpu=False, size_average=True):
+        super(DiscriminativeLoss, self).__init__(reduction='mean')
+        self.delta_var = delta_var
+        self.delta_dist = delta_dist
+        self.norm = norm
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.usegpu = usegpu
+        assert self.norm in [1, 2]
+
+    def forward(self, input, target):
+
+        return self._discriminative_loss(input, target)
+
+    def _discriminative_loss(self, embedding, seg_gt):
+        batch_size, embed_dim, H, W = embedding.shape
+        embedding = embedding.reshape(batch_size, embed_dim, H*W)
+        seg_gt = seg_gt.reshape(batch_size, H*W)
+
+        var_loss = torch.tensor(0, dtype=embedding.dtype, device=embedding.device)
+        dist_loss = torch.tensor(0, dtype=embedding.dtype, device=embedding.device)
+        reg_loss = torch.tensor(0, dtype=embedding.dtype, device=embedding.device)
+
+        for b in range(batch_size):
+            embedding_b = embedding[b]  # (embed_dim, H*W)
+            seg_gt_b = seg_gt[b]  # (H*W)
+
+            labels, indexs = torch.unique(seg_gt_b, return_inverse=True)
+            num_lanes = len(labels)
+            if num_lanes == 0:
+                _nonsense = embedding.sum()
+                _zero = torch.zeros_like(_nonsense)
+                var_loss = var_loss + _nonsense * _zero
+                dist_loss = dist_loss + _nonsense * _zero
+                reg_loss = reg_loss + _nonsense * _zero
+                continue
+
+            centroid_mean = []
+            for lane_idx in labels:
+                seg_mask_i = (seg_gt_b == lane_idx)
+
+                if not seg_mask_i.any():
+                    continue
+                
+                embedding_i = embedding_b * seg_mask_i
+                mean_i = torch.sum(embedding_i, dim=1) / torch.sum(seg_mask_i)
+                centroid_mean.append(mean_i)
+                # ---------- var_loss -------------
+                var_loss = var_loss + torch.sum(F.relu(
+                    torch.norm(embedding_i[:,seg_mask_i] - mean_i.reshape(embed_dim, 1), dim=0) - self.delta_var) ** 2) / torch.sum(seg_mask_i) / num_lanes
+            centroid_mean = torch.stack(centroid_mean)  # (n_lane, embed_dim)
+
+            if num_lanes > 1:
+                centroid_mean1 = centroid_mean.reshape(-1, 1, embed_dim)
+                centroid_mean2 = centroid_mean.reshape(1, -1, embed_dim)
+
+                dist = torch.norm(centroid_mean1 - centroid_mean2, dim=2)   # shape (num_lanes, num_lanes)
+                dist = dist + torch.eye(num_lanes, dtype=dist.dtype,
+                                        device=dist.device) * self.delta_dist
+
+                # divided by two for double calculated loss above, for implementation convenience
+                dist_loss = dist_loss + torch.sum(F.relu(-dist + self.delta_dist) ** 2) / (
+                        num_lanes * (num_lanes - 1)) / 2
+
+            # reg_loss is not used in original paper
+            reg_loss = reg_loss + torch.mean(torch.norm(centroid_mean, dim=1))
+
+        var_loss = var_loss / batch_size
+        dist_loss = dist_loss / batch_size
+        reg_loss = reg_loss / batch_size
+
+        return var_loss, dist_loss, reg_loss
+
 class EmbeddingLoss(nn.Module):
 
     def __init__(self):
@@ -264,7 +340,7 @@ class ComputeLoss:
 
         self.P = Parameters()
         self.Segmentation_Confidence_Loss = nn.BCEWithLogitsLoss(reduction="mean")#DiceBCELoss()
-        self.Feature_Embedding_Loss = EmbeddingLoss()
+        self.Feature_Embedding_Loss = DiscriminativeLoss(0.5, 1.5, 1.0, 1.0, 0.001)
         
         self.device = device  # get model device
         h = Parameters()  # hyperparameters
@@ -321,8 +397,9 @@ class ComputeLoss:
         
         dice = dice_loss(activation(Pred_Confidence),GroundTruth_Confidence,multiclass=True)
         AreaFeatureLoss = self.Feature_Embedding_Loss(Pred_EmbeddingFeatureArea,GroundTruth_EmbeddingFeatureArea)
+        # AreaFeatureLoss = 0
 
-        TotalLoss =  self.P.Alpha1*SegLoss + self.P.Alpha2 * dice + self.P.Alpha3 * AreaFeatureLoss  + self.P.Alpha4 * ObjLoss
+        TotalLoss =  self.P.Alpha1*SegLoss + self.P.Alpha2 * dice + self.P.Alpha3/3 * AreaFeatureLoss[0] + self.P.Alpha3 * AreaFeatureLoss[1] + self.P.Alpha3/1000 * AreaFeatureLoss[2] + self.P.Alpha4 * ObjLoss
         if train:
             return TotalLoss, (objdetail[0].item(),objdetail[1].item(),objdetail[2].item())
         else:
@@ -387,7 +464,8 @@ class ComputeLoss:
         bs = preds.shape[0]
         anchors = anchors.reshape(1, 3, 1, 1, 2)
         obj = targets[..., 4] == 1
-
+        has_obj = torch.count_nonzero(obj)
+        
         pxy = (preds[..., 0:2].sigmoid() * 2) - 0.5
         pwh = ((preds[..., 2:4].sigmoid() * 2) ** 2) * anchors
         pbox = torch.cat((pxy[obj], pwh[obj]), dim=-1)
@@ -398,26 +476,38 @@ class ComputeLoss:
         # ======================== #
 
         iou = intersection_over_union(pbox, tbox, GIoU=True).squeeze()  # iou(prediction, target)
-        lbox = (1.0 - iou).mean()  # iou loss
+        if has_obj>0:
+            lbox = (1.0 - iou).mean()  # iou loss
+        else:
+            lbox = torch.tensor(0)
+        # ======================= #
+        #   FOR OBJECTNESS SCORE  #
+        # ======================= #
 
-        # ======================= #
-        #   FOR OBJECTNESS SCORE    #
-        # ======================= #
         iou = iou.detach().clamp(0)
         targets[..., 4][obj] *= iou
-
         lobj = self.BCE_obj(preds[..., 4], targets[..., 4]) * balance
+
         # ================== #
         #   FOR CLASS LOSS   #
         # ================== #
         # NB: my targets[...,5:6]) is a vector of size bs, 1,
         # ultralytics targets[...,5:6]) is a matrix of shape bs, num_classes
+        if has_obj>0:
+                
+            tcls = torch.zeros_like(preds[..., 5:][obj], device=self.device)
 
-        tcls = torch.zeros_like(preds[..., 5:][obj], device=self.device)
+            tcls[torch.arange(tcls.size(0)), targets[..., 5][obj].long()] = 1.0  # for torch > 1.11.0
 
-        tcls[torch.arange(tcls.size(0)), targets[..., 5][obj].long()] = 1.0  # for torch > 1.11.0
-
-        lcls = self.BCE_cls(preds[..., 5:][obj], tcls)  # BCE
+            lcls = self.BCE_cls(preds[..., 5:][obj], tcls)  # BCE
+        else:
+            lcls = torch.tensor(0)
+        # if torch.isnan(lbox):
+        #     lbox = torch.zeros_like(lbox)
+        if torch.isnan(lobj):
+            lbox = torch.zeros_like(lobj)
+        # if torch.isnan(lcls):
+        #     lbox = torch.zeros_like(lcls)
 
         return (
             (self.lambda_box * lbox

@@ -63,4 +63,4 @@ AurigaNet offers a balance between model complexity and inference speed, providi
 
 To give you a real-time look at how AurigaNet works, here’s a demo GIF showcasing lane detection, object recognition, and drivable area segmentation in action:
 
-![Demo Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/demo/demo.gif)
+![Demo Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo1.gif)

@@ -23,7 +23,7 @@ AurigaNet outperforms state-of-the-art models in drivable area segmentation, ach
 | YOLOP                   | 640×640        | 84.5%   | 97.3%        |
 | HybridNets              | 640×640        | 83.4%   | 92.0%        |
 | Swin Transformer (T)    | 512×1024       | 81.8%   | 94.8%        |
-| **AurigaNet (Ours)**    | 640×640        | **85.2%**   | **97.7%**    |
+| **AurigaNet**    | 640×640        | **85.2%**   | **97.7%**    |
 
 ### Lane Detection
 

@@ -28,9 +28,9 @@ The cutting-edge **Multi-Task Deep Neural Network (DNN)** developed for **Autono
 ## ✨ Key Features
 
 - **Lane Detection**: 🚦 Accurately detects lanes in challenging driving conditions.
-- **Object Recognition**: 🚗 Recognizes and classifies vehicles, pedestrians, and traffic signs.
+- **Object Recognition**: 🚗 Recognizes and classifies cars, trucks, and buses.
 - **Drivable Area Detection**: 📍 Segments the drivable area for safe navigation.
-
+ **Drivable Area Instance Segmentation**: ⛍ Segments the instances of drivable area for path detection.
 ---
 
 ## 📊 Model Performance

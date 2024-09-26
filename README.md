@@ -19,7 +19,7 @@ If you use AurigaNet in your research, please consider citing our paper:
 
 ---
 
-The cutting-edge **Multi-Task Deep Neural Network (DNN)** developed for **Autonomous Vehicles** revolutionizes the way self-driving cars understand the environment. 🌍 This unified framework seamlessly integrates various tasks such as **lane detection**, **object recognition**, and **drivable area detection** into a single network. 🛣️🚘
+The cutting-edge **AurigaNet** developed for **Autonomous Vehicles** revolutionizes the way self-driving cars understand the environment. 🌍 This unified framework seamlessly integrates various tasks such as **lane detection**, **object recognition**, and **drivable area detection** into a single network. 🛣️🚘
 
 ![Network Architecture](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/architecture.svg)
 
@@ -78,9 +78,9 @@ AurigaNet balances model complexity with inference speed, providing competitive 
 
 | **Model**      | **Param (M)** | **FPS (RTX 4080)** | **Inference Time (Jetson Nano)** |
 |----------------|---------------|-------------------|-----------------------------------|
-| YOLOP          | 7.90          | 362               | n/a                               |
-| HybridNets     | 12.83         | 13.94             | n/a                               |
-| **AurigaNet**  | 9.09          | 217               | n/a                               |
+| YOLOP          | 7.90          | 362               | 4.002                          |
+| HybridNets     | 12.83         | 139               | 1.986                               |
+| **AurigaNet**  | 9.09          | 217               | 5.077                               |
 
 ---
 

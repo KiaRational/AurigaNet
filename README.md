@@ -1,18 +1,18 @@
 
-# 🚗 Multi-Task DNN for Autonomous Vehicles 🚗
+# 🚗 AurigaNet 🚗
 
 [![State-of-the-Art](https://img.shields.io/badge/State--of--the--Art-%F0%9F%94%A5-green)](https://paperswithcode.com/sota/multi-task-learning-on-bdd100k)
 [![Paper](https://img.shields.io/badge/Read%20the%20Paper-%F0%9F%93%96-blue)](https://arxiv.org/abs/12345678)  
-**AurigaNet: A Robust Multi-Task Deep Neural Network for Autonomous Driving**
+**AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Path Estimation with Discriminative Features and Deformable Convolutions**
 
 🔗 **Reference our paper**:  
 If you use AurigaNet in your research, please consider citing our paper:
 
 ```
 @article{auriganet2023,
-  title={AurigaNet: A Robust Multi-Task Deep Neural Network for Autonomous Driving},
-  author={Your Name, Co-Author},
-  journal={arXiv preprint arXiv:12345678},
+  title={AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Path Estimation with Discriminative Features and Deformable Convolutions},
+  author={Kiarash Ghasemzadeh, Sedigheh Dehghani},
+  journal={},
   year={2023}
 }
 ```

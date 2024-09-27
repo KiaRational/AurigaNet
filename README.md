@@ -165,18 +165,9 @@ code
 │   └── Netarc_1.svg
 ├── Toolkits
 │   └── __init__.py
-├── tree.py
 ├── artifacts
-│   ├── train1.zip
-│   ├── train_1
-│   │   ├── last.pt
-│   │   └── best.pt
 │   ├── last.pt
 │   ├── best.pt
-│   └── train_2
-│       ├── .ipynb_checkpoints
-│       ├── last.pt
-│       └── best.pt
 ├── seg_utils
 │   ├── losses.py
 │   ├── accuracy.py
@@ -197,5 +188,6 @@ code
 
 ## 📥 Dataset Links
 
-- [BDD100K Dataset](https://bdd-data.berkeley.edu/download.html)
-- [BDD100K Annotations](https://bdd-data.berkeley.edu/download.html)
+- [BDD100K Images (10k)](https://drive.google.com/file/d/1WMU_ey0wpuUKxf_PeC-yzaZXu_6VTe-w/view?usp=drive_link)
+- [BDD100K Labels](https://drive.google.com/file/d/1JIEcsZouh1N11dSpqrR9NCBn1aUJDE6_/view?usp=drive_link)
+- [BDD100K Segmentation Labels](https://drive.google.com/file/d/1h4kYSH-BJEFJPNARsD_-KbOFjCtikh5r/view?usp=drive_link)

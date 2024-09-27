@@ -97,13 +97,13 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
 ### Prerequisites
 - Python 3.8+
 - PyTorch 1.7+
-- CUDA 11.0 (for GPU training)
+- CUDA 11.0+ (for GPU training)
 
 ### Steps to Train
 1. Clone the repository:
    ```bash
-   git clone https://github.com/KiaRational/Multi-Task-Network.git
-   cd Multi-Task-Network
+   git clone https://github.com/KiaRational/AurigaNet.git
+   cd AurigaNet
    ```
 
 2. Install dependencies:
@@ -115,19 +115,11 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
    - [BDD100K Images (10k)](https://bdd-data.berkeley.edu/download.html)
    - [BDD100K Labels](https://bdd-data.berkeley.edu/download.html)
 
-4. Preprocess the dataset and create the necessary data splits:
-   ```bash
-   python preprocess.py --dataset-dir /path/to/bdd100k --output-dir /path/to/output
-   ```
+4. Download the preprocessed dataset and create the necessary data splits:
 
 5. Train the model:
    ```bash
-   python train.py --config configs/auriganet_config.yaml --data-dir /path/to/preprocessed/data
-   ```
-
-6. Monitor training using TensorBoard:
-   ```bash
-   tensorboard --logdir=./logs
+   python seg_utils/train.py
    ```
 
 ---
@@ -135,24 +127,69 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
 ## 🗂️ Repository Structure
 
 ```bash
-Multi-Task-Network/
-├── configs/
-│   └── auriganet_config.yaml        # Model configuration
-├── data/
-│   └── bdd100k/                     # Dataset directory
-├── frontend/
-│   ├── architecture.svg             # Network architecture image
-│   ├── demo_input.gif               # Input demo GIF
-│   └── demo1_auriganet.gif          # Output demo GIF
-├── logs/                            # TensorBoard logs
-├── models/
-│   └── auriganet.pth                # Pre-trained model weights
-├── scripts/
-│   └── train.py                     # Training script
-├── utils/
-│   ├── preprocess.py                # Dataset preprocessing
-│   └── evaluate.py                  # Evaluation script
-└── README.md
+code
+├── Dataloader
+│   ├── Preprocess.py
+│   ├── Augmentation.py
+│   ├── CreatMask.py
+│   ├── __init__.py
+│   ├── .ipynb_checkpoints
+│   │   ├── __init__-checkpoint.py
+│   │   ├── Preprocess-checkpoint.py
+│   │   └── Dataset-checkpoint.py
+│   └── Dataset.py
+├── Generated.zip
+├── main.py
+├── Models
+│   ├── MultiNet.py
+│   ├── global_spatial_attention.py
+│   ├── SegHead.py
+│   ├── ObjNeck.py
+│   ├── SegNeck.py
+│   ├── __init__.py
+│   ├── ObjHead.py
+│   ├── .ipynb_checkpoints
+│   │   ├── ObjHead-checkpoint.py
+│   │   └── MultiNet-checkpoint.py
+│   ├── BackBone.py
+│   ├── utils.py
+│   ├── local_channel_attention.py
+│   ├── global_channel_attention.py
+│   ├── glam.py
+│   ├── SegHead_v1.py
+│   ├── Neck.py
+│   └── local_spatial_attention.py
+├── frontend
+│   ├── Netarc_1_1.svg
+│   └── Netarc_1.svg
+├── Toolkits
+│   └── __init__.py
+├── tree.py
+├── artifacts
+│   ├── train1.zip
+│   ├── train_1
+│   │   ├── last.pt
+│   │   └── best.pt
+│   ├── last.pt
+│   ├── best.pt
+│   └── train_2
+│       ├── .ipynb_checkpoints
+│       ├── last.pt
+│       └── best.pt
+├── seg_utils
+│   ├── losses.py
+│   ├── accuracy.py
+│   ├── __init__.py
+│   ├── val_yolop.py
+│   ├── Parameters.py
+│   ├── utils.py
+│   ├── train.py
+│   ├── test.py
+├── PreProcess
+│   └── MaskGenerator.py
+├── requirements.txt
+
+
 ```
 
 --- 

@@ -8,11 +8,11 @@
 If you use AurigaNet in your research, please consider citing our paper:
 
 ```
-@article{auriganet2023,
+@article{auriganet2024,
   title={AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Path Estimation with Discriminative Features and Deformable Convolutions},
   author={Kiarash Ghasemzadeh, Sedigheh Dehghani},
   journal={},
-  year={2023}
+  year={2024}
 }
 ```
 

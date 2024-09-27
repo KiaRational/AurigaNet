@@ -1,12 +1,169 @@
 import torch 
 from torch import nn
-
+import torchvision
 import os 
 import sys
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
+
+
+
+class ConvBNSiLU(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias=True):
+        super().__init__(
+            nn.Conv2d(in_channels, out_channels, kernel_size,
+                      padding=padding, stride=stride, bias=bias),
+            nn.BatchNorm2d(out_channels),
+            nn.SiLU(inplace=True),
+        )
+
+
+class ObjBottleneck(nn.Module):
+    """
+    Parameters:
+        in_channels (int): number of channel of the input tensor
+        out_channels (int): number of channel of the output tensor
+        width_multiple (float): it controls the number of channels (and weights)
+                                of all the convolutions beside the
+                                first and last one. If closer to 0,
+                                the simpler the modelIf closer to 1,
+                                the model becomes more complex
+    """
+
+    def __init__(self, in_channels, out_channels, width_multiple=1):
+        super(ObjBottleneck, self).__init__()
+        c_ = int(width_multiple*in_channels)
+        self.c1 = ConvBNSiLU(in_channels, c_, kernel_size=1, stride=1, padding=0)
+        self.c2 = ConvBNSiLU(c_, out_channels, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        return self.c2(self.c1(x)) + x
+
+class GlobalChannelAttention(nn.Module):
+    def __init__(self, kernel_size):
+        super().__init__()
+        assert (kernel_size % 2 == 1), "Kernel size must be odd"
+
+        padding = (kernel_size - 1) // 2
+        self.conv_q = nn.Conv1d(1, 1, kernel_size, padding=padding)
+        self.conv_k = nn.Conv1d(1, 1, kernel_size, padding=padding)
+        self.GAP = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        N, C, H, W = x.shape
+
+        avg_pool = self.GAP(x).view(N, 1, C)
+        query = self.conv_q(avg_pool).sigmoid()
+        key = self.conv_k(avg_pool).sigmoid().transpose(1, 2)
+        query_key = torch.bmm(key, query).softmax(-1).view(N, C, C)
+
+        value = x.view(N, C, -1)
+        att = torch.bmm(query_key, value).view(N, C, H, W)
+        return x * att
+
+class GlobalSpatialAttention(nn.Module):
+    def __init__(self, in_channels, num_reduced_channels):
+        super().__init__()
+        self.conv1x1_q = nn.Conv2d(in_channels, num_reduced_channels, 1)
+        self.conv1x1_k = nn.Conv2d(in_channels, num_reduced_channels, 1)
+        self.conv1x1_v = nn.Conv2d(in_channels, num_reduced_channels, 1)
+        self.conv1x1_att = nn.Conv2d(num_reduced_channels, in_channels, 1)
+
+    def forward(self, feature_maps):
+        query = self.conv1x1_q(feature_maps)
+        N, C, H, W = query.shape
+        query = query.view(N, C, -1)
+        
+        key = self.conv1x1_k(feature_maps).view(N, C, -1)
+        query_key = torch.bmm(key.permute(0, 2, 1), query).softmax(dim=-1).view(N, H * W, H * W)
+        
+        value = self.conv1x1_v(feature_maps).view(N, C, -1)
+        att = torch.bmm(value, query_key).view(N, C, H, W)
+        att = self.conv1x1_att(att)
+        
+        return att
+
+
+class GlobalAttention(nn.Module):
+    def __init__(self, in_channels, num_reduced_channels, kernel_size):
+        super().__init__()
+        self.global_channel_attention = GlobalChannelAttention(kernel_size)
+        self.global_spatial_attention = GlobalSpatialAttention(in_channels, num_reduced_channels)
+
+    def forward(self, x):
+        global_channel_output = self.global_channel_attention(x)
+        global_attention_output = self.global_spatial_attention(x)
+        return global_attention_output * global_channel_output + global_channel_output
+class C2GA(nn.Module):
+    def __init__(self, in_channels, out_channels,feature_map_size, width_multiple=1, depth=1, backbone=True):
+        super(C2GA, self).__init__()
+        c_ = int(width_multiple*in_channels)
+
+        self.c1 = ConvBNSiLU(in_channels, c_, kernel_size=1, stride=1, padding=0)
+        self.globalatt = GlobalAttention(in_channels,in_channels//4,kernel_size=5)
+
+        if backbone:
+            self.seq = nn.Sequential(
+                *[ObjBottleneck(c_, c_, width_multiple=1) for _ in range(depth)]
+            )
+        else:
+            self.seq = nn.Sequential(
+                *[nn.Sequential(
+                    ConvBNSiLU(c_, c_, 1, 1, 0),
+                    ConvBNSiLU(c_, c_, 3, 1, 1)
+                ) for _ in range(depth)]
+            )
+        self.c_out = ConvBNSiLU(c_ * 2, out_channels,
+                         kernel_size=1, stride=1, padding=0)
+                         
+
+    def forward(self, x):
+        x = torch.cat([self.seq(self.c1(x)), self.globalatt(x)], dim=1)
+        return self.c_out(x)
+
+class C3(nn.Module):
+    """
+    Parameters:
+        in_channels (int): number of channel of the input tensor
+        out_channels (int): number of channel of the output tensor
+        width_multiple (float): it controls the number of channels (and weights)
+                                of all the convolutions beside the
+                                first and last one. If closer to 0,
+                                the simpler the modelIf closer to 1,
+                                the model becomes more complex
+        depth (int): it controls the number of times the bottleneck (residual block)
+                        is repeated within the C3 block
+        backbone (bool): if True, self.seq will be composed by bottlenecks 1, if False
+                            it will be composed by bottlenecks 2 (check in the image linked below)
+    """
+
+    def __init__(self, in_channels, out_channels, width_multiple=1, depth=1, backbone=True):
+        super(C3, self).__init__()
+        c_ = int(width_multiple*in_channels)
+
+        self.c1 = ConvBNSiLU(in_channels, c_, kernel_size=1, stride=1, padding=0)
+        self.c_skipped = ConvBNSiLU(
+            in_channels,  c_, kernel_size=1, stride=1, padding=0)
+        if backbone:
+            self.seq = nn.Sequential(
+                *[ObjBottleneck(c_, c_, width_multiple=1) for _ in range(depth)]
+            )
+        else:
+            self.seq = nn.Sequential(
+                *[nn.Sequential(
+                    ConvBNSiLU(c_, c_, 1, 1, 0),
+                    ConvBNSiLU(c_, c_, 3, 1, 1)
+                ) for _ in range(depth)]
+            )
+        self.c_out = ConvBNSiLU(c_ * 2, out_channels,
+                         kernel_size=1, stride=1, padding=0)
+                         
+        
+    def forward(self, x):
+        x = torch.cat([self.seq(self.c1(x)), self.c_skipped(x)], dim=1)
+        return self.c_out(x)
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -57,7 +214,7 @@ class Bottleneck(nn.Module):
 class C2f(nn.Module):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
-    def __init__(self, in_channels, out_channels, n=1, shortcut=False, g=1, e=0.5):
+    def __init__(self, in_channels, out_channels, n=1, shortcut=True, g=1, e=0.5):
         """Initialize CSP bottleneck layer with two convolutions with arguments ch_in, ch_out, number, shortcut, groups,
         expansion.
         """
@@ -123,4 +280,55 @@ class CBAM(nn.Module):
     def forward(self, x):
         """Applies the forward pass through C1 module."""
         return self.spatial_attention(self.channel_attention(x))
+
+
+class DeformableConv2d(nn.Module):
+    def __init__(self, in_channels,out_channels,kernel_size=3,stride=1,padding=1,bias=False):
+        super(DeformableConv2d, self).__init__()
+
+        self.padding = padding
+        
+        self.offset_conv = nn.Conv2d(in_channels, 
+                                     2 * kernel_size * kernel_size,
+                                     kernel_size=kernel_size, 
+                                     stride=stride,
+                                     padding=self.padding, 
+                                     bias=True)
+
+        nn.init.constant_(self.offset_conv.weight, 0.)
+        nn.init.constant_(self.offset_conv.bias, 0.)
+        
+        self.modulator_conv = nn.Conv2d(in_channels, 
+                                     1 * kernel_size * kernel_size,
+                                     kernel_size=kernel_size, 
+                                     stride=stride,
+                                     padding=self.padding, 
+                                     bias=True)
+
+        nn.init.constant_(self.modulator_conv.weight, 0.)
+        nn.init.constant_(self.modulator_conv.bias, 0.)
+        
+        self.regular_conv = nn.Conv2d(in_channels=in_channels,
+                                      out_channels=out_channels,
+                                      kernel_size=kernel_size,
+                                      stride=stride,
+                                      padding=self.padding,
+                                      bias=bias)
+    
+    def forward(self, x):
+
+        h, w = x.shape[2:]
+        max_offset = max(h, w)/4.
+
+        offset = self.offset_conv(x).clamp(-max_offset, max_offset)
+        modulator = 2. * torch.sigmoid(self.modulator_conv(x))
+        
+        x = torchvision.ops.deform_conv2d(input=x, 
+                                          offset=offset, 
+                                          weight=self.regular_conv.weight, 
+                                          bias=self.regular_conv.bias, 
+                                          padding=self.padding,
+                                          mask=modulator
+                                          )
+        return x
 

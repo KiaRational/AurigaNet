@@ -206,7 +206,7 @@ class CustomDataLoader:
                 box_height = y2 - y1
 
                 #filter boxes smaller than 555px 
-                if box_width*box_height >= 495:
+                if box_width*box_height >= 5:
                     xc, yc, wb, hb = self.format_yolo(
                         [box_center_x, box_center_y, box_width, box_height])
                     

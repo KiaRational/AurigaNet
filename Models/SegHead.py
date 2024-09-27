@@ -9,7 +9,7 @@ sys.path.append(project_root)
 
 from seg_utils.Parameters import Parameters
 from Models.utils import *
-
+from Models.glam import GLAM
 #######################################################
 
 class BasicConv(nn.Module):
@@ -216,22 +216,29 @@ class Output(nn.Sequential):
         ConvBNReLU(in_channels//4, in_channels//8, 3, 1, 1),
         nn.Conv2d(in_channels//8, out_channels, kernel_size=1, padding=0, stride=1, bias=False),
         )
+class Output_deform(nn.Sequential):
+    def __init__(self, in_channels, out_channels):
+        super(Output_deform, self).__init__(
 
+        DeformableConv2d(in_channels, in_channels//4, 3, 1, 1),
+        DeformableConv2d(in_channels//4, in_channels//8, 3, 1, 1),
+        DeformableConv2d(in_channels//8, out_channels, kernel_size=1, stride=1, padding=0,bias=False),
+        )
 class LaneSegHead(nn.Module):
     def __init__(self, out_channels_list ,w,r,d ):
         super(LaneSegHead,self).__init__()
         
         self.MixUpsample_1 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.c2f_1 = C2f(in_channels = int(1.5*out_channels_list[2]//w ), out_channels= int(1.5*out_channels_list[2]//w ))
-        self.MixUpsample_2 = MixedUpsample(in_channels = int(1.5*out_channels_list[2]//w ) , out_channels = int(1.5*out_channels_list[2]//w ))
-        self.c2f_2 = C2f(in_channels =int(1.5*out_channels_list[2]//w ) , out_channels= out_channels_list[2]//w)
-        self.MixUpsample_3 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.c3_1 = C3(in_channels = int((out_channels_list[2]+out_channels_list[1])//w ), out_channels= int((out_channels_list[2]+out_channels_list[1])//w ),depth=3)
+        self.MixUpsample_2 = MixedUpsample(in_channels = int((out_channels_list[2]+out_channels_list[1])//w ) , out_channels = int((out_channels_list[2]+out_channels_list[1])//w ))
+        self.c3_2 = C3(in_channels =int((out_channels_list[2]+out_channels_list[1])//w ) , out_channels= out_channels_list[2]//w,depth=3)
         self.out =   Output(out_channels_list[2]//w , 1 )
 
 
     def forward(self,Quarter,Octant):
-        x = self.c2f_1(torch.cat((self.MixUpsample_1(Octant),Quarter),1))
-        x = self.c2f_2(self.MixUpsample_2(x))
+        x = self.c3_1(torch.cat((self.MixUpsample_1(Octant),Quarter),1))
+        x = self.c3_2(x)
+        # print(x.size())
 
         return self.out(x)
 
@@ -240,33 +247,24 @@ class Area_FE_Head(nn.Module):
         super(Area_FE_Head,self).__init__()
 
         self.MixUpsample_1 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.c2f_1_d = C2f(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w)
-        self.MixUpsample_2 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
-        self.c2f_2_d = C2f(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w)
-        self.MixUpsample_3 = MixedUpsample(in_channels = out_channels_list[2]//w , out_channels = out_channels_list[2]//w)
+        self.c3_1_d = C3(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels= (out_channels_list[2]+out_channels_list[1])//w,depth = 3)
+        self.MixUpsample_2 = MixedUpsample(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels = (out_channels_list[2]+out_channels_list[1])//w)
+        self.c3_2_d = C3(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels= (out_channels_list[2]+out_channels_list[1])//w,depth=3)
+        self.MixUpsample_3 = MixedUpsample(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels = (out_channels_list[2]+out_channels_list[1])//w)
+        self.def_conv_1_f = DeformableConv2d(in_channels =(out_channels_list[2]+out_channels_list[1])//w , out_channels= (out_channels_list[2]+out_channels_list[1])//w)
+        self.DownsampleConv_1 = DownsampleConv(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels= (out_channels_list[2]+out_channels_list[1])//w,downsample_ratio=2)
+        self.def_conv_3_f = DeformableConv2d(in_channels = (out_channels_list[2]+out_channels_list[1])//w , out_channels= (out_channels_list[2]+out_channels_list[1])//w,kernel_size=3,stride=1,padding=1)
+        self.out_d =   Output((out_channels_list[2]+out_channels_list[1])//w , 1 )
+        self.def_conv_4_1 =   DeformableConv2d((out_channels_list[2]+out_channels_list[1])//w,(out_channels_list[2]+out_channels_list[1])//w)
+        self.out_f =   DeformableConv2d((out_channels_list[2]+out_channels_list[1])//w, out_fe)
 
-        self.c2f_1_f = C2f(in_channels =3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w)
-        # self.c2f_2_f = C2f(in_channels = 2*out_channels_list[2]//w , out_channels= 2*out_channels_list[2]//w)
-        # self.c2f_3_f = C2f(in_channels = 3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w)
-
-        self.DownsampleConv_1 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w,downsample_ratio=2)
-        # self.DownsampleConv_2 = DownsampleConv(in_channels = out_channels_list[2]//w , out_channels= out_channels_list[2]//w,downsample_ratio=4)
-        # self.DownsampleConv_3 = DownsampleConv(in_channels = 3*out_channels_list[2]//w , out_channels= 3*out_channels_list[2]//w,downsample_ratio=2)
-
-        self.out_d =   Output(out_channels_list[2]//w , 1 )
-        self.out_f =   Output(3*out_channels_list[2]//w, out_fe)
-
-    
-    def forward(self,Octant):
-        out_d = self.c2f_1_d(self.MixUpsample_1(Octant))
-        out_f = self.c2f_1_f(self.DownsampleConv_1(out_d))
-        out_d = self.c2f_2_d(self.MixUpsample_2(out_d))
-        # out_f = self.out_f(self.DownsampleConv_3(self.c2f_3_f(torch.cat((out_f,self.DownsampleConv_2(out_d)),1))))
+    def forward(self,Quarter,Octant):
+        out_d = self.c3_1_d(torch.cat((self.MixUpsample_1(Octant),Quarter),1))
+        out_d = self.c3_2_d(out_d)
+        out_f = self.def_conv_1_f(self.def_conv_3_f(self.DownsampleConv_1(out_d)))
         out_d = self.out_d(out_d)
-        out_f = self.out_f(out_f)
-
+        out_f = self.out_f(self.def_conv_4_1(out_f))
         return [out_d,out_f]
-
 
 class SegHead(nn.Module):
     def __init__(self, out_channels_list ,w,r,d , class_number):
@@ -276,10 +274,11 @@ class SegHead(nn.Module):
 
         self.lane = LaneSegHead(out_channels_list ,w,r,d )
         self.area_fe = Area_FE_Head(out_channels_list, w,r,d , self.p.feature_size)
-        
-    def forward(self, Half,Quarter,Octant,One_sixteenth):
-        area_fe_out = self.area_fe(Octant)
-        Out_Confidence = torch.cat((self.lane(Quarter,Octant),area_fe_out[0]),1)
 
-        return [Out_Confidence, area_fe_out[1] ]  
+
+    def forward(self, Half,Quarter,Octant,One_sixteenth):
+        area_fe_out = self.area_fe(Quarter,Octant)
+        Out_Confidence = torch.cat((area_fe_out[0],self.lane(Quarter,Octant)),1)
+
+        return [Out_Confidence, area_fe_out[1]]  
 

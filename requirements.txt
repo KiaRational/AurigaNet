@@ -1,0 +1,16 @@
+torch
+numpy 
+tqdm
+opencv-python
+matplotlib
+torchvision
+torchmetrics
+torchinfo
+pydantic
+albumentations
+prefetch_generator
+gdown
+wget
+faster-coco-eval
+pycocotools
+rich

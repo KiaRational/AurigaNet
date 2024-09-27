@@ -1,4 +1,4 @@
-
+```markdown
 # 🚗 AurigaNet 🚗
 
 [![State-of-the-Art](https://img.shields.io/badge/State--of--the--Art-%F0%9F%94%A5-green)](https://paperswithcode.com/sota/multi-task-learning-on-bdd100k)
@@ -91,3 +91,75 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
 ![Demo Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo_input.gif)
 ![input Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo1_auriganet.gif)
 
+---
+
+## 🏗️ How to Train the Model
+
+### Prerequisites
+- Python 3.8+
+- PyTorch 1.7+
+- CUDA 11.0 (for GPU training)
+
+### Steps to Train
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/KiaRational/Multi-Task-Network.git
+   cd Multi-Task-Network
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Download the **BDD100K dataset**:
+   - [BDD100K Images (10k)](https://bdd-data.berkeley.edu/download.html)
+   - [BDD100K Labels](https://bdd-data.berkeley.edu/download.html)
+
+4. Preprocess the dataset and create the necessary data splits:
+   ```bash
+   python preprocess.py --dataset-dir /path/to/bdd100k --output-dir /path/to/output
+   ```
+
+5. Train the model:
+   ```bash
+   python train.py --config configs/auriganet_config.yaml --data-dir /path/to/preprocessed/data
+   ```
+
+6. Monitor training using TensorBoard:
+   ```bash
+   tensorboard --logdir=./logs
+   ```
+
+---
+
+## 🗂️ Repository Structure
+
+```bash
+Multi-Task-Network/
+├── configs/
+│   └── auriganet_config.yaml        # Model configuration
+├── data/
+│   └── bdd100k/                     # Dataset directory
+├── frontend/
+│   ├── architecture.svg             # Network architecture image
+│   ├── demo_input.gif               # Input demo GIF
+│   └── demo1_auriganet.gif          # Output demo GIF
+├── logs/                            # TensorBoard logs
+├── models/
+│   └── auriganet.pth                # Pre-trained model weights
+├── scripts/
+│   └── train.py                     # Training script
+├── utils/
+│   ├── preprocess.py                # Dataset preprocessing
+│   └── evaluate.py                  # Evaluation script
+└── README.md
+```
+
+--- 
+
+## 📥 Dataset Links
+
+- [BDD100K Dataset](https://bdd-data.berkeley.edu/download.html)
+- [BDD100K Annotations](https://bdd-data.berkeley.edu/download.html)
+``` 

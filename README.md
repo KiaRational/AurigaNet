@@ -128,59 +128,58 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
 ## 🗂️ Repository Structure
 
 ```bash
-code
-├── Dataloader
-│   ├── Preprocess.py
-│   ├── Augmentation.py
-│   ├── CreatMask.py
-│   ├── __init__.py
-│   ├── .ipynb_checkpoints
-│   │   ├── __init__-checkpoint.py
-│   │   ├── Preprocess-checkpoint.py
-│   │   └── Dataset-checkpoint.py
-│   └── Dataset.py
-├── Generated.zip
-├── main.py
-├── Models
-│   ├── MultiNet.py
-│   ├── global_spatial_attention.py
-│   ├── SegHead.py
-│   ├── ObjNeck.py
-│   ├── SegNeck.py
-│   ├── __init__.py
-│   ├── ObjHead.py
-│   ├── .ipynb_checkpoints
-│   │   ├── ObjHead-checkpoint.py
-│   │   └── MultiNet-checkpoint.py
-│   ├── BackBone.py
-│   ├── utils.py
-│   ├── local_channel_attention.py
-│   ├── global_channel_attention.py
-│   ├── glam.py
-│   ├── SegHead_v1.py
-│   ├── Neck.py
-│   └── local_spatial_attention.py
-├── frontend
-│   ├── Netarc_1_1.svg
-│   └── Netarc_1.svg
-├── Toolkits
-│   └── __init__.py
+.
+├── all preprocess.py
 ├── artifacts
-│   ├── last.pt
-│   ├── best.pt
-├── seg_utils
-│   ├── losses.py
-│   ├── accuracy.py
-│   ├── __init__.py
-│   ├── val_yolop.py
-│   ├── Parameters.py
-│   ├── utils.py
-│   ├── train.py
-│   ├── test.py
+├── Dataloader
+│   ├── Augmentation.py
+│   ├── CreatMask.py
+│   ├── Dataset.py
+│   ├── __init__.py
+│   ├── new.png
+│   ├── Preprocess.py
+├── frontend
+│   ├── architecture.svg
+│   ├── AurigaNet_arc-1.png
+│   ├── AurigaNet_arc-1.svg
+│   ├── demo1_auriganet.gif
+│   ├── demo1.gif
+│   ├── demo_input.gif
+│   ├── Netarc_1_1.svg
+│   └── Netarc_1.svg
+├── __init__.py
+├── Models
+│   ├── auriganet.onnx
+│   ├── BackBone.py
+│   ├── glam.py
+│   ├── global_channel_attention.py
+│   ├── global_spatial_attention.py
+│   ├── __init__.py
+│   ├── local_channel_attention.py
+│   ├── local_spatial_attention.py
+│   ├── MultiNet.py
+│   ├── Neck.py
+│   ├── ObjHead.py
+│   ├── ObjNeck.py
+│   ├── SegHead.py
+│   ├── SegHead_v1.py
+│   ├── SegNeck.py
+│   └── utils.py
 ├── PreProcess
-│   └── MaskGenerator.py
+│   └── MaskGenerator.py
+├── README.md
 ├── requirements.txt
-
+├── seg_utils
+│   ├── accuracy.py
+│   ├── __init__.py
+│   ├── losses.py
+│   ├── Parameters.py
+│   ├── test.py
+│   ├── train.py
+│   ├── utils.py
+│   └── val_yolop.py
+└── Toolkits
+    └── __init__.py
 
 ```
 

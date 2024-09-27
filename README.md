@@ -112,9 +112,9 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
    ```
 
 3. Download the **BDD100K dataset**:
-   - [BDD100K Images (10k)](https://bdd-data.berkeley.edu/download.html)
-   - [BDD100K Labels](https://bdd-data.berkeley.edu/download.html)
-   - [BDD100K Segmentation Labels](https://bdd-data.berkeley.edu/download.html)
+   - [BDD100K Images (10k)](https://drive.google.com/file/d/1WMU_ey0wpuUKxf_PeC-yzaZXu_6VTe-w/view?usp=drive_link)
+   - [BDD100K Labels](https://drive.google.com/file/d/1JIEcsZouh1N11dSpqrR9NCBn1aUJDE6_/view?usp=drive_link)
+   - [BDD100K Segmentation Labels](https://drive.google.com/file/d/1h4kYSH-BJEFJPNARsD_-KbOFjCtikh5r/view?usp=drive_link)
 
 4. Download the preprocessed dataset and create the necessary data splits and modify seg_utils/parameters.py file:
 

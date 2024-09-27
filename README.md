@@ -1,4 +1,3 @@
-```markdown
 # 🚗 AurigaNet 🚗
 
 [![State-of-the-Art](https://img.shields.io/badge/State--of--the--Art-%F0%9F%94%A5-green)](https://paperswithcode.com/sota/multi-task-learning-on-bdd100k)
@@ -162,4 +161,3 @@ Multi-Task-Network/
 
 - [BDD100K Dataset](https://bdd-data.berkeley.edu/download.html)
 - [BDD100K Annotations](https://bdd-data.berkeley.edu/download.html)
-``` 

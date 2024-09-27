@@ -2,14 +2,14 @@
 
 [![State-of-the-Art](https://img.shields.io/badge/State--of--the--Art-%F0%9F%94%A5-green)](https://paperswithcode.com/sota/multi-task-learning-on-bdd100k)
 [![Paper](https://img.shields.io/badge/Read%20the%20Paper-%F0%9F%93%96-blue)](https://arxiv.org/abs/12345678)  
-**AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Path Estimation with Discriminative Features and Deformable Convolutions**
+**AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Drivable Paths Estimation with Discriminative Features**
 
 🔗 **Reference our paper**:  
 If you use AurigaNet in your research, please consider citing our paper:
 
 ```
 @article{auriganet2024,
-  title={AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Path Estimation with Discriminative Features and Deformable Convolutions},
+  title={AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Drivable Paths Estimation with Discriminative Features},
   author={Kiarash Ghasemzadeh, Sedigheh Dehghani},
   journal={},
   year={2024}

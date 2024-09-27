@@ -23,6 +23,7 @@ class CustomDataLoader:
     def __init__(self, data_path, label_path, image_size=(720, 1280), normalize=True, class_mapping=None , train=True , transform=True):
         self.data_path = data_path
         self.p = Parameters()
+        self.t = train
         self.image_size = image_size
         self.normalize = normalize
         self.class_mapping = class_mapping
@@ -70,6 +71,7 @@ class CustomDataLoader:
         combined_mask = None
         lane_mark_mask = None
         drivable_mask = None
+        f = self.t
 
         # Get image name and path from the annotation
         image_name = annotation['name']
@@ -93,7 +95,7 @@ class CustomDataLoader:
         drivable_clustered_mask = cv2.cvtColor(drivable_clustered_mask, cv2.COLOR_BGR2GRAY)
         drivable_mask = drivable_clustered_mask>0.1
         eroded = cv2.erode(drivable_mask.astype(np.float32), None, iterations=6)
-        object_annotations = self.create_masks(annotation, False)
+        object_annotations = self.create_masks(annotation, False, not(f))
         bboxes = []
         class_ids = []
         for object_annot in object_annotations:
@@ -158,7 +160,7 @@ class CustomDataLoader:
         
         return image  , cluster_mask , drivable_clustered_mask_pooled , object_annotations 
 
-    def create_masks(self, annotation , CreateMasks = True ) :
+    def create_masks(self, annotation , CreateMasks = True , train=True) :
         lane_clustered = np.zeros((720, 1280))
         drivable_clustered = np.zeros((720, 1280))
         lane_cluster_index = 1
@@ -202,11 +204,10 @@ class CustomDataLoader:
                 # Convert bounding box to YOLO format
                 box_center_x = (x1 + x2) / 2.0
                 box_center_y = (y1 + y2) / 2.0
-                box_width = x2 - x1
-                box_height = y2 - y1
-
-                #filter boxes smaller than 555px 
-                if box_width*box_height >= 495:
+                box_width = (x2 - x1)/640
+                box_height = (y2 - y1)/640
+                
+                if box_width*box_height >= 0.001208 and train:
                     xc, yc, wb, hb = self.format_yolo(
                         [box_center_x, box_center_y, box_width, box_height])
                     
@@ -221,7 +222,7 @@ class CustomDataLoader:
 
     def format_yolo(self, box):
 
-        xc, yc, wb, hb = box[0]/(640), box[1]/640, box[2]/640, box[3]/640
+        xc, yc, wb, hb = box[0]/(640), box[1]/640, box[2], box[3]
         
         return [xc, yc, wb, hb]
 

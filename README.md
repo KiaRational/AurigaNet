@@ -146,7 +146,6 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
 │   ├── demo1.gif
 │   ├── demo_input.gif
 │   ├── Netarc_1_1.svg
-│   └── Netarc_1.svg
 ├── __init__.py
 ├── Models
 │   ├── auriganet.onnx

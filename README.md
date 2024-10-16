@@ -5,6 +5,7 @@
 
 [![PyTorch - Version](https://img.shields.io/badge/PYTORCH-1.7+-red?style=for-the-badge&logo=pytorch)](https://pytorch.org/get-started/locally/) 
 [![Python - Version](https://img.shields.io/badge/PYTHON-3.8+-red?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
+
 **AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Drivable Paths Estimation with Discriminative Features**
 
 🔗 **Reference our paper**:  

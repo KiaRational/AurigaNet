@@ -87,6 +87,10 @@ AurigaNet balances model complexity with inference speed, providing competitive 
 
 ---
 
+## 🖼️ Results Compare
+
+![Figure 8](https://github.com/user-attachments/assets/a5bf5be1-e240-432f-9ae9-1f4ca29388ff)
+
 ## 🎥 Demo Test
 
 Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, object recognition, and drivable area segmentation:

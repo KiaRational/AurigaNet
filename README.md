@@ -188,7 +188,12 @@ Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, obj
     └── __init__.py
 
 ```
-
+---
+## Acknowldge
+We thank the following excellent projects:
+- [YOLOP](https://github.com/hustvl/YOLOP)
+- [HybridNets](https://github.com/datvuthanh/HybridNets)
+- [YOLOV5](https://github.com/ultralytics/yolov5)
 --- 
 
 ## 📥 Dataset Links

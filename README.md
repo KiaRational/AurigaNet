@@ -1,7 +1,6 @@
 # 🚗 AurigaNet 🚗
 
-[![State-of-the-Art](https://img.shields.io/badge/State--of--the--Art-%F0%9F%94%A5-green)](https://paperswithcode.com/sota/multi-task-learning-on-bdd100k)
-[![Paper](https://img.shields.io/badge/Read%20the%20Paper-%F0%9F%93%96-blue)](https://arxiv.org/abs/12345678)  
+[![Paper](https://img.shields.io/badge/Read%20the%20Paper-%F0%9F%93%96-blue)](https://arxiv.org/abs/2602.10660)  
 
 [![PyTorch - Version](https://img.shields.io/badge/PYTORCH-1.7+-red?style=for-the-badge&logo=pytorch)](https://pytorch.org/get-started/locally/) 
 [![Python - Version](https://img.shields.io/badge/PYTHON-3.8+-red?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)

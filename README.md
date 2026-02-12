@@ -12,11 +12,14 @@
 If you use AurigaNet in your research, please consider citing our paper:
 
 ```
-@article{auriganet2024,
-  title={AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Drivable Paths Estimation with Discriminative Features},
-  author={Kiarash Ghasemzadeh, Sedigheh Dehghani},
-  journal={},
-  year={2024}
+@misc{ghasemzadeh2026auriganetrealtimemultitasknetwork,
+      title={AurigaNet: A Real-Time Multi-Task Network for Enhanced Urban Driving Perception}, 
+      author={Kiarash Ghasemzadeh and Sedigheh Dehghani},
+      year={2026},
+      eprint={2602.10660},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2602.10660}, 
 }
 ```
 
@@ -37,6 +40,8 @@ The cutting-edge **AurigaNet** developed for **Autonomous Vehicles** revolutioni
 ---
 
 ## 📊 Model Performance
+
+The model weights can be downloaded here: [Weights](https://drive.google.com/file/d/1GVxusSGK3qZudcxqb4N4tJ9SP7T5TD_g/view?usp=sharing)
 
 ### 🛣️ Drivable Area Segmentation
 

@@ -8,20 +8,13 @@
 
 **AurigaNet: A Multi-Task Real-Time Path Aggregation Network for Enhanced Urban Driving Perception and Drivable Paths Estimation with Discriminative Features**
 
-🔗 **Reference our paper**:  
-If you use AurigaNet in your research, please consider citing our paper:
 
-```
-@misc{ghasemzadeh2026auriganetrealtimemultitasknetwork,
-      title={AurigaNet: A Real-Time Multi-Task Network for Enhanced Urban Driving Perception}, 
-      author={Kiarash Ghasemzadeh and Sedigheh Dehghani},
-      year={2026},
-      eprint={2602.10660},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2602.10660}, 
-}
-```
+## 🎥 Demo Test
+
+Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, object recognition, and drivable area segmentation:
+
+![Demo Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo_input.gif)
+![input Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo1_auriganet.gif)
 
 ---
 
@@ -94,13 +87,6 @@ AurigaNet balances model complexity with inference speed, providing competitive 
 
 ## 🖼️ Results Compare
 ![Figure 8](https://github.com/user-attachments/assets/a5bf5be1-e240-432f-9ae9-1f4ca29388ff)
-
-## 🎥 Demo Test
-
-Here’s a demo GIF showcasing **AurigaNet** in action, with lane detection, object recognition, and drivable area segmentation:
-
-![Demo Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo_input.gif)
-![input Test GIF](https://github.com/KiaRational/Multi-Task-Network/blob/main/frontend/demo1_auriganet.gif)
 
 ---
 
@@ -206,3 +192,19 @@ We thank the following excellent projects:
 - [BDD100K Images (10k)](https://drive.google.com/file/d/1WMU_ey0wpuUKxf_PeC-yzaZXu_6VTe-w/view?usp=drive_link)
 - [BDD100K Labels](https://drive.google.com/file/d/1JIEcsZouh1N11dSpqrR9NCBn1aUJDE6_/view?usp=drive_link)
 - [BDD100K Segmentation Labels](https://drive.google.com/file/d/1h4kYSH-BJEFJPNARsD_-KbOFjCtikh5r/view?usp=drive_link)
+
+
+🔗 **Reference our paper**:  
+If you use AurigaNet in your research, please consider citing our paper:
+
+```
+@misc{ghasemzadeh2026auriganetrealtimemultitasknetwork,
+      title={AurigaNet: A Real-Time Multi-Task Network for Enhanced Urban Driving Perception}, 
+      author={Kiarash Ghasemzadeh and Sedigheh Dehghani},
+      year={2026},
+      eprint={2602.10660},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2602.10660}, 
+}
+```
